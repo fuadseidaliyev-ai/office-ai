@@ -1,5 +1,7 @@
 # 🎙️ Office AI — Voice Assistant
 
+![tests](https://github.com/fuadseidaliyev-ai/office-ai/actions/workflows/tests.yml/badge.svg)
+
 A hands-free voice assistant that can actually **operate your computer**. You
 speak; it listens, thinks, runs real tools on your machine (files, shell
 commands, the web), and answers out loud.
