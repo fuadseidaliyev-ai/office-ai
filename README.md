@@ -62,6 +62,19 @@ python -m voice_assistant
 Start talking. Say **"goodbye"** (or `Ctrl-C`) to quit. The first run downloads
 the Whisper model, so give it a moment.
 
+### Text mode (no microphone needed)
+
+To try it without audio — or on a machine with no mic/speakers — type your
+commands instead of speaking:
+
+```bash
+python -m voice_assistant --text          # type commands, printed replies
+python -m voice_assistant --text --speak  # type commands, spoken replies
+```
+
+Same agent, same system access — only the input/output changes. Type `exit` to
+quit.
+
 ## Configuration
 
 All settings live in `.env` (see `.env.example` for the full list). The ones you'll
