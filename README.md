@@ -45,7 +45,27 @@ never leaves the machine for transcription or speech.
   - **Linux:** `sudo apt-get install espeak-ng` (use `espeak-ng`, not the older `espeak`, which breaks pyttsx3's voice setup)
   - **Windows:** built-in (SAPI5)
 
-## Install
+## Quick start (one command)
+
+After cloning, let the setup script do everything — install system libraries,
+create the environment, install dependencies, ask for your API key once, and
+launch:
+
+```bash
+# macOS / Linux
+bash run.sh
+
+# Windows (PowerShell)
+powershell -ExecutionPolicy Bypass -File run.ps1
+```
+
+When it prints `🎙️ ready`, just say **«привет джарвис»**. That's it.
+
+> You still need two things only you can provide: an **Anthropic API key**
+> (the script prompts for it and saves it to `.env`) and a **microphone** —
+> run this on your own computer, not on a remote/headless box.
+
+## Install (manual)
 
 ```bash
 git clone <this-repo> office-ai && cd office-ai
