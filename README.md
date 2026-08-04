@@ -40,7 +40,7 @@ never leaves the machine for transcription or speech.
   - **Windows:** bundled with the `sounddevice` wheel — nothing extra
 - `pyttsx3` voice backend:
   - **macOS:** built-in (NSSpeechSynthesizer)
-  - **Linux:** `sudo apt-get install espeak`
+  - **Linux:** `sudo apt-get install espeak-ng` (use `espeak-ng`, not the older `espeak`, which breaks pyttsx3's voice setup)
   - **Windows:** built-in (SAPI5)
 
 ## Install
