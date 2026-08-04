@@ -1,11 +1,29 @@
 #!/usr/bin/env bash
 # One-command setup + launch for the voice assistant (macOS / Linux).
-# Usage:  bash run.sh
+#
+# From inside the repo:   bash run.sh
+# From anywhere (bootstraps itself — clones the repo first):
+#   curl -fsSL https://raw.githubusercontent.com/fuadseidaliyev-ai/office-ai/claude/voice-assistant-agent-sdk-biae9n/run.sh | bash
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")" 2>/dev/null || true
 
 say() { printf '\n\033[1;36m%s\033[0m\n' "$1"; }
 warn() { printf '\033[1;33m%s\033[0m\n' "$1"; }
+
+# ------------------------------------------------ 0. bootstrap (if needed) ---
+# When piped via curl (or run outside the repo), fetch the project first.
+REPO_URL="${OFFICE_AI_REPO:-https://github.com/fuadseidaliyev-ai/office-ai.git}"
+BRANCH="${OFFICE_AI_BRANCH:-claude/voice-assistant-agent-sdk-biae9n}"
+if [ ! -f voice_assistant/__main__.py ]; then
+  say "0/4  Fetching the project…"
+  if [ -d office-ai/.git ]; then
+    cd office-ai
+  else
+    git clone --branch "$BRANCH" "$REPO_URL" office-ai
+    cd office-ai
+  fi
+  git checkout "$BRANCH" >/dev/null 2>&1 || true
+fi
 
 # ------------------------------------------------ 1. system audio libraries --
 say "1/4  Installing system audio libraries (PortAudio, espeak-ng)…"
@@ -49,7 +67,8 @@ current_key="$(grep -E '^ANTHROPIC_API_KEY=' .env | cut -d= -f2- || true)"
 case "$current_key" in
   ""|sk-ant-...*)
     printf '\n🔑  Paste your Anthropic API key (from https://console.anthropic.com), then press Enter:\n'
-    read -r key
+    # Read from the real terminal even when this script is piped via curl.
+    if [ -t 0 ]; then read -r key; else read -r key < /dev/tty; fi
     python - "$key" <<'PY'
 import sys, re, pathlib
 key = sys.argv[1].strip()

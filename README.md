@@ -47,17 +47,22 @@ never leaves the machine for transcription or speech.
 
 ## Quick start (one command)
 
-After cloning, let the setup script do everything — install system libraries,
-create the environment, install dependencies, ask for your API key once, and
-launch:
+One command does everything — clones the project, installs system libraries,
+creates the environment, installs dependencies, asks for your API key once,
+and launches:
 
 ```bash
-# macOS / Linux
-bash run.sh
-
-# Windows (PowerShell)
-powershell -ExecutionPolicy Bypass -File run.ps1
+# macOS / Linux (paste into Terminal)
+curl -fsSL https://raw.githubusercontent.com/fuadseidaliyev-ai/office-ai/claude/voice-assistant-agent-sdk-biae9n/run.sh | bash
 ```
+
+```powershell
+# Windows (paste into PowerShell)
+iwr -useb https://raw.githubusercontent.com/fuadseidaliyev-ai/office-ai/claude/voice-assistant-agent-sdk-biae9n/run.ps1 | iex
+```
+
+Already cloned the repo? The same scripts work from inside it:
+`bash run.sh` / `powershell -ExecutionPolicy Bypass -File run.ps1`.
 
 When it prints `🎙️ ready`, just say **«привет джарвис»**. That's it.
 

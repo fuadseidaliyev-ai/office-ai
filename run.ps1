@@ -1,9 +1,23 @@
 # One-command setup + launch for the voice assistant (Windows PowerShell).
-# Usage:  powershell -ExecutionPolicy Bypass -File run.ps1
+#
+# From inside the repo:  powershell -ExecutionPolicy Bypass -File run.ps1
+# From anywhere (bootstraps itself — clones the repo first):
+#   iwr -useb https://raw.githubusercontent.com/fuadseidaliyev-ai/office-ai/claude/voice-assistant-agent-sdk-biae9n/run.ps1 | iex
 $ErrorActionPreference = "Stop"
-Set-Location -Path $PSScriptRoot
+if ($PSScriptRoot) { Set-Location -Path $PSScriptRoot }
 
 function Say($m) { Write-Host "`n$m" -ForegroundColor Cyan }
+
+# 0. Bootstrap: when run outside the repo (e.g. piped via iwr), fetch it first.
+$Branch = "claude/voice-assistant-agent-sdk-biae9n"
+if (-not (Test-Path "voice_assistant\__main__.py")) {
+    Say "0/4  Fetching the project..."
+    if (-not (Test-Path "office-ai\.git")) {
+        git clone --branch $Branch https://github.com/fuadseidaliyev-ai/office-ai.git office-ai
+    }
+    Set-Location "office-ai"
+    git checkout $Branch 2>$null | Out-Null
+}
 
 # 1. System audio libraries: not needed on Windows (bundled with the wheels).
 Say "1/4  System audio libraries: nothing to install on Windows."
