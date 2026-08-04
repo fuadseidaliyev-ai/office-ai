@@ -103,14 +103,38 @@ This assistant can run shell commands and modify files on your computer. The
 | `acceptEdits` | Auto-accepts file edits; still guarded on other tools. *(default)* |
 | `bypassPermissions` | Runs everything without asking. Convenient, but only use it in a directory you trust it in. |
 
+### The built-in safety guard
+
+On top of the permission mode, `voice_assistant/permissions.py` installs a
+**`PreToolUse` hook** that inspects every tool call *before* it runs. Unlike a
+`can_use_tool` callback (which the SDK skips under `bypassPermissions`), a
+PreToolUse hook fires in **every** mode — so it's a real backstop even when you
+run wide open. It blocks:
+
+- **Catastrophic shell commands** — `rm -rf /`, fork bombs, `mkfs`, `dd` to a
+  block device, `shutdown`/`reboot`, `sudo`, piping a download into a shell,
+  writing into `/etc`,`/boot`,`/sys`,`/proc`, disk partitioning, …
+- **Writes outside the working directory** — both via the Write/Edit tools and,
+  best-effort, via shell redirects (`>`, `>>`, `tee`, `dd of=`).
+  Toggle with `ASSISTANT_CONFINE_WRITES`.
+
+> ⚠️ **Be honest with yourself about the shell.** A shell can write files in
+> ways regex can't reliably catch (`python -c 'open("/etc/x","w")'`, base64
+> tricks, …). The command blocklist and shell-write confinement are a safety
+> net, **not a security sandbox**. For a *hard* boundary, set
+> **`ASSISTANT_ALLOW_SHELL=false`** to remove the Bash tool entirely — the
+> assistant then works only through Read/Write/Edit/Glob/Grep/Web and the
+> custom tools, all of which respect the working-directory confinement.
+
 Recommendations:
 
 - Point **`ASSISTANT_WORKDIR`** at a specific project folder to scope what it
   touches, rather than leaving it at your whole home directory.
 - Start in `plan` mode to get a feel for how it interprets your requests.
-- For tighter control, add a `can_use_tool` permission callback in
-  `voice_assistant/agent.py` — the SDK supports allow/deny decisions per tool
-  call (e.g. block any `Bash` command containing `rm -rf`).
+- For real isolation (not just this guard), run the assistant as a dedicated
+  low-privilege user or inside a container/VM.
+- Extend the blocklist in `voice_assistant/permissions.py` — add patterns to
+  `DANGEROUS_COMMANDS` to refuse more commands.
 
 ## Project layout
 
@@ -120,6 +144,7 @@ voice_assistant/
 ├── config.py          # settings loaded from .env
 ├── assistant.py       # the listen → transcribe → think → speak loop
 ├── agent.py           # Claude Agent SDK session + system access
+├── permissions.py     # PreToolUse safety guard (blocks dangerous ops)
 ├── tools.py           # custom tools (current_time, system_info, open_path, notify)
 └── audio/
     ├── recorder.py    # mic capture + voice-activity detection
@@ -134,7 +159,8 @@ assistant remembers the conversation) and hands it:
 
 - the built-in system tools via `allowed_tools`,
 - our custom tools via an in-process MCP server (`create_sdk_mcp_server`),
-- a `permission_mode` and `cwd` that bound what it can do and where.
+- a `permission_mode` and `cwd` that bound what it can do and where,
+- a `PreToolUse` hook (`permissions.py`) that vetoes dangerous calls in any mode.
 
 Each spoken command becomes a `client.query(...)`; the agent loop may call
 several tools before producing its final spoken answer, which we stream back

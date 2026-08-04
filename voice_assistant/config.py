@@ -41,6 +41,10 @@ class Config:
     # TTS
     tts_rate: int
 
+    # Safety
+    confine_writes: bool
+    allow_shell: bool
+
     @classmethod
     def load(cls) -> "Config":
         workdir = _get("ASSISTANT_WORKDIR") or str(Path.home())
@@ -57,6 +61,10 @@ class Config:
             vad_aggressiveness=int(_get("VAD_AGGRESSIVENESS", "2")),
             silence_timeout=float(_get("SILENCE_TIMEOUT", "1.0")),
             tts_rate=int(_get("TTS_RATE", "185")),
+            confine_writes=_get("ASSISTANT_CONFINE_WRITES", "true").lower()
+            not in {"0", "false", "no", "off"},
+            allow_shell=_get("ASSISTANT_ALLOW_SHELL", "true").lower()
+            not in {"0", "false", "no", "off"},
         )
 
     def validate(self) -> None:

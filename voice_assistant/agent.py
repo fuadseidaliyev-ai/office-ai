@@ -12,11 +12,13 @@ from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,
     ClaudeSDKClient,
+    HookMatcher,
     ResultMessage,
     TextBlock,
 )
 
 from .config import Config
+from .permissions import PermissionGuard
 from .tools import CUSTOM_TOOL_NAMES, build_tools_server
 
 # Built-in tools that grant real access to the machine.
@@ -43,17 +45,31 @@ class VoiceAgent:
         self._client: ClaudeSDKClient | None = None
 
     def _build_options(self) -> ClaudeAgentOptions:
+        guard = PermissionGuard(
+            self._config.workdir,
+            confine_writes=self._config.confine_writes,
+        )
+        # A hard boundary: dropping Bash removes the biggest way to escape the
+        # write-confinement heuristics (shell redirects, cp, python -c, ...).
+        tools = list(BUILTIN_TOOLS)
+        if not self._config.allow_shell:
+            tools.remove("Bash")
         return ClaudeAgentOptions(
             system_prompt={
                 "type": "preset",
                 "preset": "claude_code",
                 "append": SYSTEM_PROMPT,
             },
-            allowed_tools=BUILTIN_TOOLS + CUSTOM_TOOL_NAMES,
+            allowed_tools=tools + CUSTOM_TOOL_NAMES,
             permission_mode=self._config.permission_mode,
             model=self._config.model,
             cwd=str(self._config.workdir),
             mcp_servers={"system": build_tools_server()},
+            # PreToolUse fires in every permission mode (incl. bypassPermissions),
+            # so the guard is a real backstop, not just an ask-first prompt.
+            hooks={
+                "PreToolUse": [HookMatcher(hooks=[guard.pre_tool_use_hook])],
+            },
         )
 
     async def __aenter__(self) -> "VoiceAgent":
