@@ -9,8 +9,12 @@ from __future__ import annotations
 
 from .agent import VoiceAgent
 from .config import Config
+from .wake import WakeDetector
 
 EXIT_PHRASES = {"exit", "quit", "stop listening", "goodbye", "выход", "стоп"}
+
+# Spoken when woken by the wake word alone, before the command is given.
+WAKE_ACK = "Да, слушаю."
 
 
 def _is_exit(text: str) -> bool:
@@ -20,17 +24,6 @@ def _is_exit(text: str) -> bool:
 class Assistant:
     def __init__(self, config: Config):
         self._config = config
-
-    def _passes_wake_word(self, text: str) -> tuple[bool, str]:
-        """If a wake word is configured, require it and strip it from the command."""
-        wake = self._config.wake_word
-        if not wake:
-            return True, text
-        lowered = text.lower()
-        if wake in lowered:
-            idx = lowered.find(wake) + len(wake)
-            return True, text[idx:].strip(" ,.!?")
-        return False, text
 
     # ---------------------------------------------------------------- voice --
     async def run(self) -> None:
@@ -48,9 +41,14 @@ class Assistant:
         )
         tts = Speaker(rate=self._config.tts_rate)
 
-        print("🎙️  Voice assistant ready. Speak — say 'goodbye' to quit.")
-        if self._config.wake_word:
-            print(f"    (wake word: '{self._config.wake_word}')")
+        detector = (
+            WakeDetector(self._config.wake_word) if self._config.wake_word else None
+        )
+        awaiting_command = False  # True after the wake word, waiting for the command
+
+        print("🎙️  Voice assistant ready. Say 'goodbye' to quit.")
+        if detector:
+            print(f"    Sleeping — say '{self._config.wake_word}' to wake me.")
 
         async with VoiceAgent(self._config) as agent:
             while True:
@@ -67,9 +65,22 @@ class Assistant:
                     tts.say("Goodbye.")
                     break
 
-                triggered, command = self._passes_wake_word(text)
-                if not triggered or not command:
-                    continue
+                # Wake-word gating.
+                if detector and not awaiting_command:
+                    woken, remainder = detector.detect(text)
+                    if not woken:
+                        continue  # stay dormant
+                    if not remainder:
+                        # Just the wake word — acknowledge and wait for the command.
+                        print("🤖 (awake) Да, слушаю.")
+                        tts.say(WAKE_ACK)
+                        awaiting_command = True
+                        continue
+                    command = remainder
+                else:
+                    command = text
+
+                awaiting_command = False  # consume the activation
 
                 try:
                     reply = await agent.ask(command)

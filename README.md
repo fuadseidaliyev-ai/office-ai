@@ -64,6 +64,21 @@ python -m voice_assistant
 Start talking. Say **"goodbye"** (or `Ctrl-C`) to quit. The first run downloads
 the Whisper model, so give it a moment.
 
+### Waking it up
+
+By default the assistant **sleeps until it hears its name** (`WAKE_WORD`,
+set to `привет джарвис`). Two ways to use it:
+
+- Say the phrase alone — *"привет джарвис"* — it answers *"Да, слушаю"*, then
+  your next sentence is the command.
+- Say it in one breath — *"привет джарвис, открой папку загрузки"* — it acts
+  right away.
+
+After each command it goes back to sleep and waits for the wake phrase again.
+Name matching tolerates how speech-to-text spells it (джарвис / жарвис /
+jarvis…). Change the phrase — or set `WAKE_WORD=` empty for always-on mode
+where every sentence is a command — in `.env`.
+
 ### Text mode (no microphone needed)
 
 To try it without audio — or on a machine with no mic/speakers — type your
@@ -88,7 +103,7 @@ most likely touch:
 | `ASSISTANT_MODEL` | Claude model to use | `claude-sonnet-5` |
 | `ASSISTANT_PERMISSION_MODE` | How much it can do without asking | `acceptEdits` |
 | `ASSISTANT_WORKDIR` | Directory it operates in | your home dir |
-| `WAKE_WORD` | Only act after this word (e.g. `computer`) | *(off)* |
+| `WAKE_WORD` | Phrase that wakes the assistant (e.g. `привет джарвис`) | `привет джарвис` |
 | `WHISPER_MODEL` | STT accuracy vs. speed (`tiny`…`large-v3`) | `base` |
 | `STT_LANGUAGE` | Language hint (`en`, `ru`, …) | auto-detect |
 | `SILENCE_TIMEOUT` | Seconds of silence that end a command | `1.0` |
@@ -147,6 +162,7 @@ voice_assistant/
 ├── assistant.py       # the listen → transcribe → think → speak loop
 ├── agent.py           # Claude Agent SDK session + system access
 ├── permissions.py     # PreToolUse safety guard (blocks dangerous ops)
+├── wake.py            # wake-word detection ("привет джарвис")
 ├── tools.py           # custom tools (current_time, system_info, open_path, notify)
 └── audio/
     ├── recorder.py    # mic capture + voice-activity detection
