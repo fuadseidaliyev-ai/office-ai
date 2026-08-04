@@ -166,6 +166,16 @@ Each spoken command becomes a `client.query(...)`; the agent loop may call
 several tools before producing its final spoken answer, which we stream back
 out through text-to-speech.
 
+## Tests
+
+The safety guard and tool wiring are covered by unit tests (no API key or
+audio hardware needed):
+
+```bash
+pip install -e ".[dev]"    # or: pip install pytest
+pytest
+```
+
 ## Extending it
 
 Add a new capability by writing a tool in `voice_assistant/tools.py`:

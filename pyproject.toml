@@ -22,5 +22,12 @@ voice-assistant = "voice_assistant.__main__:main"
 requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
 [tool.setuptools]
 packages = ["voice_assistant", "voice_assistant.audio"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
