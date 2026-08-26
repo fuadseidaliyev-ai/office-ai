@@ -1,0 +1,17 @@
+# --- Claude Agent SDK (the brain + system access) ---
+claude-agent-sdk>=0.1.0
+anyio>=4.0.0
+
+# --- Audio capture / playback ---
+sounddevice>=0.4.6        # microphone capture + speaker playback
+numpy>=1.24.0             # audio buffer math
+webrtcvad>=2.0.10         # voice-activity detection (end-of-speech)
+
+# --- Speech-to-text (local, offline) ---
+faster-whisper>=1.0.0     # Whisper inference, CPU or GPU
+
+# --- Text-to-speech (local, offline) ---
+pyttsx3>=2.90             # cross-platform offline TTS
+
+# --- Config ---
+python-dotenv>=1.0.0

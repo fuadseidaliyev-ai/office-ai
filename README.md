@@ -1,0 +1,243 @@
+# 🎙️ Office AI — Voice Assistant
+
+![tests](https://github.com/fuadseidaliyev-ai/office-ai/actions/workflows/tests.yml/badge.svg)
+
+A hands-free voice assistant that can actually **operate your computer**. You
+speak; it listens, thinks, runs real tools on your machine (files, shell
+commands, the web), and answers out loud.
+
+The "brain" is the **[Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview)** —
+the same agent loop that powers Claude Code. That's what gives the assistant
+system access: the SDK's built-in `Bash`, `Read`, `Write`, `Edit`, `Glob`,
+`Grep`, `WebFetch` and `WebSearch` tools, plus a few custom ones defined here.
+
+```
+   🎤 mic ──► VAD ──► Whisper (STT) ──► Claude Agent SDK ──► pyttsx3 (TTS) ──► 🔊
+              │         (local)          │   tools:                (local)
+       end-of-speech                     │   Bash / Read / Write / Edit
+       detection                         │   Glob / Grep / WebFetch / WebSearch
+                                         │   current_time / system_info
+                                         │   open_path / notify
+```
+
+Everything except the Claude API call runs **locally and offline** — your voice
+never leaves the machine for transcription or speech.
+
+## What it can do
+
+- *"What time is it and what's my disk usage?"* → answers out loud.
+- *"Open my Downloads folder."* → launches the file manager.
+- *"Create a file called notes.txt on my desktop with today's todo list."*
+- *"Find every TODO in my project and summarize them."*
+- *"Search the web for the weather in Baku and tell me if I need a jacket."*
+
+## Requirements
+
+- Python 3.10+
+- **One of two ways to authenticate** (the setup script walks you through it):
+  - **Claude subscription (Pro/Max)** — recommended. Sign in once with
+    `claude auth login`; the assistant then uses your plan's usage limit.
+    No API key, no separate billing.
+  - **API key** from the [Anthropic Console](https://console.anthropic.com/)
+    (pay-per-use), placed in `.env`.
+- A working microphone and speakers
+- System audio libraries for `sounddevice` (PortAudio):
+  - **macOS:** `brew install portaudio`
+  - **Debian/Ubuntu:** `sudo apt-get install portaudio19-dev`
+  - **Windows:** bundled with the `sounddevice` wheel — nothing extra
+- `pyttsx3` voice backend:
+  - **macOS:** built-in (NSSpeechSynthesizer)
+  - **Linux:** `sudo apt-get install espeak-ng` (use `espeak-ng`, not the older `espeak`, which breaks pyttsx3's voice setup)
+  - **Windows:** built-in (SAPI5)
+
+## Quick start (one command)
+
+One command does everything — clones the project, installs system libraries,
+creates the environment, installs dependencies, sets up authentication
+(sign in with your Claude account, or paste an API key), and launches:
+
+```bash
+# macOS / Linux (paste into Terminal)
+curl -fsSL https://raw.githubusercontent.com/fuadseidaliyev-ai/office-ai/claude/voice-assistant-agent-sdk-biae9n/run.sh | bash
+```
+
+```powershell
+# Windows (paste into PowerShell)
+iwr -useb https://raw.githubusercontent.com/fuadseidaliyev-ai/office-ai/claude/voice-assistant-agent-sdk-biae9n/run.ps1 | iex
+```
+
+Already cloned the repo? The same scripts work from inside it:
+`bash run.sh` / `powershell -ExecutionPolicy Bypass -File run.ps1`.
+
+When it prints `🎙️ ready`, just say **«привет джарвис»**. That's it.
+
+> You still need two things only you can provide: a way to **sign in**
+> (your Claude account in the browser, or an API key) and a **microphone** —
+> run this on your own computer, not on a remote/headless box.
+
+## Install (manual)
+
+```bash
+git clone <this-repo> office-ai && cd office-ai
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+
+cp .env.example .env
+# Then either sign in with your Claude subscription (recommended):
+#   .venv/lib/python*/site-packages/claude_agent_sdk/_bundled/claude auth login
+#   (or just `claude auth login` if you have Claude Code installed)
+# ...or edit .env and set ANTHROPIC_API_KEY=sk-ant-...
+```
+
+## Run
+
+```bash
+python -m voice_assistant
+```
+
+Start talking. Say **"goodbye"** (or `Ctrl-C`) to quit. The first run downloads
+the Whisper model, so give it a moment.
+
+### Waking it up
+
+By default the assistant **sleeps until it hears its name** (`WAKE_WORD`,
+set to `привет джарвис`). Two ways to use it:
+
+- Say the phrase alone — *"привет джарвис"* — it answers *"Да, слушаю"*, then
+  your next sentence is the command.
+- Say it in one breath — *"привет джарвис, открой папку загрузки"* — it acts
+  right away.
+
+After each command it goes back to sleep and waits for the wake phrase again.
+Name matching tolerates how speech-to-text spells it (джарвис / жарвис /
+jarvis…). Change the phrase — or set `WAKE_WORD=` empty for always-on mode
+where every sentence is a command — in `.env`.
+
+### Text mode (no microphone needed)
+
+To try it without audio — or on a machine with no mic/speakers — type your
+commands instead of speaking:
+
+```bash
+python -m voice_assistant --text          # type commands, printed replies
+python -m voice_assistant --text --speak  # type commands, spoken replies
+```
+
+Same agent, same system access — only the input/output changes. Type `exit` to
+quit.
+
+## Configuration
+
+All settings live in `.env` (see `.env.example` for the full list). The ones you'll
+most likely touch:
+
+| Variable | What it does | Default |
+| --- | --- | --- |
+| `ANTHROPIC_API_KEY` | API key — leave empty to use your Claude subscription login instead | *(empty)* |
+| `ASSISTANT_MODEL` | Claude model to use | `claude-sonnet-5` |
+| `ASSISTANT_PERMISSION_MODE` | How much it can do without asking | `acceptEdits` |
+| `ASSISTANT_WORKDIR` | Directory it operates in | your home dir |
+| `WAKE_WORD` | Phrase that wakes the assistant (e.g. `привет джарвис`) | `привет джарвис` |
+| `WHISPER_MODEL` | STT accuracy vs. speed (`tiny`…`large-v3`) | `base` |
+| `STT_LANGUAGE` | Language hint (`en`, `ru`, …) | auto-detect |
+| `SILENCE_TIMEOUT` | Seconds of silence that end a command | `1.0` |
+
+## Safety / permissions
+
+This assistant can run shell commands and modify files on your computer. The
+`ASSISTANT_PERMISSION_MODE` setting controls how much freedom it has:
+
+| Mode | Behavior |
+| --- | --- |
+| `plan` | Read-only. Plans but never changes anything. Safest for trying it out. |
+| `default` | Asks before edits and commands. |
+| `acceptEdits` | Auto-accepts file edits; still guarded on other tools. *(default)* |
+| `bypassPermissions` | Runs everything without asking. Convenient, but only use it in a directory you trust it in. |
+
+### The built-in safety guard
+
+On top of the permission mode, `voice_assistant/permissions.py` installs a
+**`PreToolUse` hook** that inspects every tool call *before* it runs. Unlike a
+`can_use_tool` callback (which the SDK skips under `bypassPermissions`), a
+PreToolUse hook fires in **every** mode — so it's a real backstop even when you
+run wide open. It blocks:
+
+- **Catastrophic shell commands** — `rm -rf /`, fork bombs, `mkfs`, `dd` to a
+  block device, `shutdown`/`reboot`, `sudo`, piping a download into a shell,
+  writing into `/etc`,`/boot`,`/sys`,`/proc`, disk partitioning, …
+- **Writes outside the working directory** — both via the Write/Edit tools and,
+  best-effort, via shell redirects (`>`, `>>`, `tee`, `dd of=`).
+  Toggle with `ASSISTANT_CONFINE_WRITES`.
+
+> ⚠️ **Be honest with yourself about the shell.** A shell can write files in
+> ways regex can't reliably catch (`python -c 'open("/etc/x","w")'`, base64
+> tricks, …). The command blocklist and shell-write confinement are a safety
+> net, **not a security sandbox**. For a *hard* boundary, set
+> **`ASSISTANT_ALLOW_SHELL=false`** to remove the Bash tool entirely — the
+> assistant then works only through Read/Write/Edit/Glob/Grep/Web and the
+> custom tools, all of which respect the working-directory confinement.
+
+Recommendations:
+
+- Point **`ASSISTANT_WORKDIR`** at a specific project folder to scope what it
+  touches, rather than leaving it at your whole home directory.
+- Start in `plan` mode to get a feel for how it interprets your requests.
+- For real isolation (not just this guard), run the assistant as a dedicated
+  low-privilege user or inside a container/VM.
+- Extend the blocklist in `voice_assistant/permissions.py` — add patterns to
+  `DANGEROUS_COMMANDS` to refuse more commands.
+
+## Project layout
+
+```
+voice_assistant/
+├── __main__.py        # entry point (python -m voice_assistant)
+├── config.py          # settings loaded from .env
+├── assistant.py       # the listen → transcribe → think → speak loop
+├── agent.py           # Claude Agent SDK session + system access
+├── permissions.py     # PreToolUse safety guard (blocks dangerous ops)
+├── wake.py            # wake-word detection ("привет джарвис")
+├── tools.py           # custom tools (current_time, system_info, open_path, notify)
+└── audio/
+    ├── recorder.py    # mic capture + voice-activity detection
+    ├── stt.py         # faster-whisper transcription
+    └── tts.py         # pyttsx3 speech synthesis
+```
+
+## How the system access works
+
+`agent.py` opens a single long-lived `ClaudeSDKClient` session (so the
+assistant remembers the conversation) and hands it:
+
+- the built-in system tools via `allowed_tools`,
+- our custom tools via an in-process MCP server (`create_sdk_mcp_server`),
+- a `permission_mode` and `cwd` that bound what it can do and where,
+- a `PreToolUse` hook (`permissions.py`) that vetoes dangerous calls in any mode.
+
+Each spoken command becomes a `client.query(...)`; the agent loop may call
+several tools before producing its final spoken answer, which we stream back
+out through text-to-speech.
+
+## Tests
+
+The safety guard and tool wiring are covered by unit tests (no API key or
+audio hardware needed):
+
+```bash
+pip install -e ".[dev]"    # or: pip install pytest
+pytest
+```
+
+## Extending it
+
+Add a new capability by writing a tool in `voice_assistant/tools.py`:
+
+```python
+@tool("play_music", "Start playing music.", {"genre": str})
+async def play_music(args: dict) -> dict:
+    ...  # do the thing
+    return {"content": [{"type": "text", "text": "Playing jazz."}]}
+```
+
+then add `"mcp__system__play_music"` to `CUSTOM_TOOL_NAMES`. That's it — the
+assistant can now call it by voice.

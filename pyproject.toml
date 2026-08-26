@@ -1,0 +1,33 @@
+[project]
+name = "office-ai-voice-assistant"
+version = "0.1.0"
+description = "A hands-free voice assistant with system access, built on the Claude Agent SDK."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "claude-agent-sdk>=0.1.0",
+    "anyio>=4.0.0",
+    "sounddevice>=0.4.6",
+    "numpy>=1.24.0",
+    "webrtcvad>=2.0.10",
+    "faster-whisper>=1.0.0",
+    "pyttsx3>=2.90",
+    "python-dotenv>=1.0.0",
+]
+
+[project.scripts]
+voice-assistant = "voice_assistant.__main__:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.setuptools]
+packages = ["voice_assistant", "voice_assistant.audio"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
