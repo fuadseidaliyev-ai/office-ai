@@ -60,14 +60,35 @@ source .venv/bin/activate
 python -m pip install --upgrade pip >/dev/null
 pip install -r requirements.txt
 
-# --------------------------------------------------------- 3. API key --------
-say "3/4  Checking your Anthropic API key…"
+# ----------------------------------------------------- 3. authentication -----
+say "3/4  Setting up authentication…"
 [ -f .env ] || cp .env.example .env
+
+# Locate a Claude CLI: system-wide, or the one bundled inside the SDK package.
+CLI="$(command -v claude || true)"
+if [ -z "$CLI" ]; then
+  CLI="$(python -c "import claude_agent_sdk, pathlib; p = pathlib.Path(claude_agent_sdk.__file__).parent / '_bundled' / 'claude'; print(p if p.exists() else '')" 2>/dev/null || true)"
+fi
+
+cli_logged_in() {
+  [ -n "$CLI" ] && "$CLI" auth status 2>/dev/null | grep -q '"loggedIn": *true'
+}
+
 current_key="$(grep -E '^ANTHROPIC_API_KEY=' .env | cut -d= -f2- || true)"
-case "$current_key" in
-  ""|sk-ant-...*)
-    printf '\n🔑  Paste your Anthropic API key (from https://console.anthropic.com), then press Enter:\n'
-    # Read from the real terminal even when this script is piped via curl.
+case "$current_key" in ""|sk-ant-...*) current_key="";; esac
+
+if [ -n "$current_key" ]; then
+  echo "Using the API key from .env."
+elif cli_logged_in; then
+  echo "Using your Claude account login (subscription plan limit) — no API key needed."
+else
+  printf '\nHow should the assistant authenticate?\n'
+  printf '  1) Claude subscription (Pro/Max) — sign in once in the browser, uses your plan limit  [default]\n'
+  printf '  2) API key from console.anthropic.com — pay-per-use\n'
+  printf 'Choose 1 or 2 and press Enter: '
+  if [ -t 0 ]; then read -r choice; else read -r choice < /dev/tty; fi
+  if [ "${choice:-1}" = "2" ]; then
+    printf '\n🔑  Paste your Anthropic API key, then press Enter:\n'
     if [ -t 0 ]; then read -r key; else read -r key < /dev/tty; fi
     python - "$key" <<'PY'
 import sys, re, pathlib
@@ -80,9 +101,17 @@ else:
 p.write_text(t)
 print("Saved to .env")
 PY
-    ;;
-  *) echo "API key already set." ;;
-esac
+  else
+    if [ -z "$CLI" ]; then
+      warn "Claude CLI not found — this should not happen after pip install; falling back to API key."
+      exit 1
+    fi
+    echo "A browser window will open — sign in with your Claude account…"
+    if [ -t 0 ]; then "$CLI" auth login; else "$CLI" auth login < /dev/tty; fi
+    cli_logged_in || { warn "Login did not complete; re-run this script to try again."; exit 1; }
+    echo "Signed in — the assistant will use your subscription's usage limit."
+  fi
+fi
 
 # ----------------------------------------------------------- 4. launch -------
 say "4/4  Starting the assistant — say «привет джарвис» 🎙️"

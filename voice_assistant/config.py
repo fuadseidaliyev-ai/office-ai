@@ -68,9 +68,36 @@ class Config:
         )
 
     def validate(self) -> None:
-        if not self.api_key:
+        if not self.api_key and not _claude_cli_logged_in():
             raise SystemExit(
-                "ANTHROPIC_API_KEY is not set. Copy .env.example to .env and add your key."
+                "No authentication found. Pick one:\n"
+                "  1) Claude subscription (Pro/Max) — run `claude auth login` once\n"
+                "     (uses your plan's usage limit, no API key needed), or\n"
+                "  2) API key — put ANTHROPIC_API_KEY=sk-ant-... in .env\n"
+                "     (from https://console.anthropic.com, billed per use)."
             )
         if not self.workdir.exists():
             raise SystemExit(f"ASSISTANT_WORKDIR does not exist: {self.workdir}")
+
+
+def _claude_cli_logged_in() -> bool:
+    """True if the Claude Code CLI has a signed-in account (subscription auth).
+
+    The Agent SDK runs on top of that CLI, so a CLI login means the assistant
+    can work with no API key, using the account's plan limits.
+    """
+    import json
+    import shutil
+    import subprocess
+
+    if not shutil.which("claude"):
+        return False
+    try:
+        out = subprocess.run(
+            ["claude", "auth", "status"],
+            capture_output=True, text=True, timeout=15,
+        )
+        return bool(json.loads(out.stdout or "{}").get("loggedIn"))
+    except Exception:
+        # Older CLIs lack `auth status`; fall back to the credentials file.
+        return (Path.home() / ".claude" / ".credentials.json").exists()

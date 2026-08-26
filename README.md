@@ -34,7 +34,12 @@ never leaves the machine for transcription or speech.
 ## Requirements
 
 - Python 3.10+
-- An **`ANTHROPIC_API_KEY`** (from the [Anthropic Console](https://console.anthropic.com/))
+- **One of two ways to authenticate** (the setup script walks you through it):
+  - **Claude subscription (Pro/Max)** — recommended. Sign in once with
+    `claude auth login`; the assistant then uses your plan's usage limit.
+    No API key, no separate billing.
+  - **API key** from the [Anthropic Console](https://console.anthropic.com/)
+    (pay-per-use), placed in `.env`.
 - A working microphone and speakers
 - System audio libraries for `sounddevice` (PortAudio):
   - **macOS:** `brew install portaudio`
@@ -48,8 +53,8 @@ never leaves the machine for transcription or speech.
 ## Quick start (one command)
 
 One command does everything — clones the project, installs system libraries,
-creates the environment, installs dependencies, asks for your API key once,
-and launches:
+creates the environment, installs dependencies, sets up authentication
+(sign in with your Claude account, or paste an API key), and launches:
 
 ```bash
 # macOS / Linux (paste into Terminal)
@@ -66,8 +71,8 @@ Already cloned the repo? The same scripts work from inside it:
 
 When it prints `🎙️ ready`, just say **«привет джарвис»**. That's it.
 
-> You still need two things only you can provide: an **Anthropic API key**
-> (the script prompts for it and saves it to `.env`) and a **microphone** —
+> You still need two things only you can provide: a way to **sign in**
+> (your Claude account in the browser, or an API key) and a **microphone** —
 > run this on your own computer, not on a remote/headless box.
 
 ## Install (manual)
@@ -77,7 +82,11 @@ git clone <this-repo> office-ai && cd office-ai
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
-cp .env.example .env        # then edit .env and add your ANTHROPIC_API_KEY
+cp .env.example .env
+# Then either sign in with your Claude subscription (recommended):
+#   .venv/lib/python*/site-packages/claude_agent_sdk/_bundled/claude auth login
+#   (or just `claude auth login` if you have Claude Code installed)
+# ...or edit .env and set ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ## Run
@@ -124,7 +133,7 @@ most likely touch:
 
 | Variable | What it does | Default |
 | --- | --- | --- |
-| `ANTHROPIC_API_KEY` | Your API key (required) | — |
+| `ANTHROPIC_API_KEY` | API key — leave empty to use your Claude subscription login instead | *(empty)* |
 | `ASSISTANT_MODEL` | Claude model to use | `claude-sonnet-5` |
 | `ASSISTANT_PERMISSION_MODE` | How much it can do without asking | `acceptEdits` |
 | `ASSISTANT_WORKDIR` | Directory it operates in | your home dir |
