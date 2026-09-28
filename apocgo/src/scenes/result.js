@@ -1,5 +1,5 @@
 import { panel, text } from '../engine/text.js';
-import { VIEW_W, VIEW_H } from '../game/config.js';
+import { UI_W, UI_H, VIEW_W, VIEW_H } from '../game/config.js';
 
 // Summary after a run: why it ended and what was brought back.
 export class ResultScene {
@@ -21,7 +21,7 @@ export class ResultScene {
 
   renderUI(ui) {
     const r = this.r;
-    const cx = VIEW_W / 2;
+    const cx = UI_W / 2;
     text(ui, r.won ? 'ДОБРАЛИСЬ' : 'КОНЕЦ ПУТИ', cx, 30, { size: 30, align: 'center', color: r.won ? '#9fdc6a' : '#c8433a' });
     text(ui, r.reason, cx, 66, { size: 13, align: 'center', color: '#d8c9a3' });
 
@@ -39,6 +39,6 @@ export class ResultScene {
       text(ui, String(v), cx + 120, 96 + i * 16, { size: 11, align: 'right' });
     });
 
-    text(ui, '[Enter] В гараж    [Esc] Меню', cx, VIEW_H - 40, { size: 12, align: 'center', color: '#e0b25a' });
+    text(ui, '[Enter] В гараж    [Esc] Меню', cx, UI_H - 40, { size: 12, align: 'center', color: '#e0b25a' });
   }
 }

@@ -1,8 +1,10 @@
 // Lightweight top-down particle system (dust, blood, sparks, debris).
 
 export class Particles {
-  constructor(max = 600) {
+  /** `scale` multiplies particle speed and size (world units per art pixel). */
+  constructor(max = 600, scale = 1) {
     this.max = max;
+    this.scale = scale;
     this.list = [];
   }
 
@@ -13,14 +15,14 @@ export class Particles {
     for (let i = 0; i < count; i++) {
       if (this.list.length >= this.max) this.list.shift();
       const a = angle + (Math.random() - 0.5) * spread;
-      const s = speed * (0.4 + Math.random() * 0.6);
+      const s = speed * this.scale * (0.4 + Math.random() * 0.6);
       this.list.push({
         x, y,
         vx: Math.cos(a) * s,
         vy: Math.sin(a) * s,
         life: life * (0.6 + Math.random() * 0.4),
         maxLife: life,
-        size: size + (Math.random() < 0.3 ? 1 : 0),
+        size: Math.round((size + (Math.random() < 0.3 ? 1 : 0)) * this.scale),
         color: colors[(Math.random() * colors.length) | 0],
         friction,
       });

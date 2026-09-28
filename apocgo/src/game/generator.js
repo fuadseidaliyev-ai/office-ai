@@ -8,18 +8,18 @@
 import { RNG, hashSeed } from '../engine/rng.js';
 import { aabbOverlap, clamp } from '../engine/math.js';
 import {
-  CHUNK_H, ROAD_HALF, DRIVE_HALF, SAFE_CHUNKS, SPAWN, ZOMBIE, PICKUPS, GRAFFITI,
+  ART, CHUNK_H, DECOR, DRIVE_HALF, PICKUPS, ROAD_HALF, SAFE_CHUNKS, SPAWN, ZOMBIE,
 } from './config.js';
 
 const BANDS = 3;
 
-// Big obstacles. `solid` blocks the truck; w/h ranges in px.
+// Big obstacles. `solid` blocks the truck; w/h ranges in px (the hitbox).
 const BLOCKERS = {
-  collapse: { weight: 3, w: [48, 104], h: [26, 44] }, // провал / обвал асфальта
-  rubble: { weight: 3, w: [28, 58], h: [18, 30] }, // обломки, камни
-  wreck: { weight: 3 }, // брошенная машина
-  pole: { weight: 2, w: [60, 110], h: [6, 6] }, // упавший столб
-  tree: { weight: 2, w: [50, 84], h: [10, 12] }, // поваленное дерево
+  collapse: { weight: 3 }, // провал асфальта
+  barricade: { weight: 3, w: [150, 230], h: [80, 110] }, // завал из бочек и покрышек
+  wreck: { weight: 3 }, // брошенная полицейская машина
+  rail: { weight: 2 }, // сорванный отбойник
+  tree: { weight: 2 }, // поваленное дерево
 };
 
 export function difficultyFor(chunkIndex) {
@@ -34,15 +34,21 @@ export function generateChunk(seed, index) {
   const solids = []; // for overlap checks while placing
 
   addDecor(rng, top, out);
-  addCracks(rng, top, out, 3 + rng.int(0, 3));
+  addCracks(rng, top, out, rng.int(7, 12));
+  for (let i = rng.int(0, 2); i > 0; i--) {
+    out.decals.push({
+      kind: 'art', art: rng.pick(ART.blood), flip: rng.chance(0.5),
+      x: rng.range(-ROAD_HALF + 40, ROAD_HALF - 40), y: top + rng.range(0, CHUNK_H),
+    });
+  }
   if (index < SAFE_CHUNKS) return out;
 
   if (rng.chance(SPAWN.graffitiChance)) {
     out.decals.push({
-      kind: 'graffiti',
-      text: rng.pick(GRAFFITI),
-      x: rng.pick([-ROAD_HALF / 2, ROAD_HALF / 2]),
-      y: top + rng.range(40, CHUNK_H - 40),
+      kind: 'art',
+      art: rng.pick(ART.graffiti),
+      x: rng.pick([-1, 1]) * rng.range(ROAD_HALF * 0.35, ROAD_HALF * 0.65),
+      y: top + rng.range(150, CHUNK_H - 150),
     });
   }
 
@@ -52,32 +58,33 @@ export function generateChunk(seed, index) {
     if (!rng.chance(SPAWN.blockerChance(d))) continue;
     const kind = rng.weighted(Object.fromEntries(Object.entries(BLOCKERS).map(([k, v]) => [k, v.weight])));
     const ob = makeBlocker(rng, kind);
-    ob.x = rng.range(-ROAD_HALF - 20 + ob.w / 2, ROAD_HALF + 20 - ob.w / 2);
-    ob.y = top + b * bandH + rng.range(ob.h / 2 + 4, bandH - ob.h / 2 - 4);
+    ob.x = rng.range(-ROAD_HALF - 60 + ob.w / 2, ROAD_HALF + 60 - ob.w / 2);
+    ob.y = top + b * bandH + rng.range(ob.h / 2 + 10, bandH - ob.h / 2 - 10);
     out.obstacles.push(ob);
     solids.push(ob);
   }
 
   // 2. Potholes (hazard, not solid) — only on asphalt.
   for (let i = rng.int(...SPAWN.potholes(d)); i > 0; i--) {
-    const r = rng.range(5, 10);
+    const r = rng.range(18, 32);
     const p = place(rng, top, solids, r * 2, r * 2, ROAD_HALF - r);
     if (p) out.obstacles.push({ kind: 'pothole', ...p, r, solid: false, hazard: true, seed: rng.int(0, 1e9) });
   }
 
   // 3. Small breakable debris: barrels and tyres.
   for (let i = rng.int(...SPAWN.smallDebris(d)); i > 0; i--) {
-    const kind = rng.chance(0.6) ? 'barrel' : 'tire';
-    const p = place(rng, top, solids, 9, 9, DRIVE_HALF - 8);
+    const tire = rng.chance(0.35);
+    const art = rng.pick(tire ? ART.tires : ART.barrels);
+    const p = place(rng, top, solids, 44, 44, DRIVE_HALF - 30);
     if (!p) continue;
-    const ob = { kind, ...p, solid: false, breakable: true, seed: rng.int(0, 1e9) };
+    const ob = { kind: tire ? 'tire' : 'barrel', art, ...p, solid: false, breakable: true, flip: rng.chance(0.5) };
     out.obstacles.push(ob);
     solids.push(ob);
   }
 
   // 4. Zombies.
   for (let i = rng.int(...SPAWN.zombies(d)); i > 0; i--) {
-    const p = place(rng, top, solids, 10, 12, DRIVE_HALF - 6);
+    const p = place(rng, top, solids, ZOMBIE.w, ZOMBIE.h, DRIVE_HALF - 20);
     if (!p) continue;
     out.zombies.push({
       ...p,
@@ -85,7 +92,7 @@ export function generateChunk(seed, index) {
       chaseSpeed: rng.range(...ZOMBIE.chaseSpeed),
       dir: rng.range(0, Math.PI * 2),
       t: rng.range(0, 10),
-      variant: rng.int(0, 2),
+      art: rng.pick(ART.zombies),
       dead: false,
     });
   }
@@ -94,7 +101,7 @@ export function generateChunk(seed, index) {
   for (const [type, chance] of Object.entries(SPAWN.pickupChance)) {
     if (!rng.chance(chance)) continue;
     const onShoulder = rng.chance(0.5);
-    const p = place(rng, top, solids, 12, 12, onShoulder ? DRIVE_HALF - 8 : ROAD_HALF - 8, onShoulder ? ROAD_HALF + 10 : 0);
+    const p = place(rng, top, solids, 44, 44, onShoulder ? DRIVE_HALF - 30 : ROAD_HALF - 30, onShoulder ? ROAD_HALF + 40 : 0);
     if (!p) continue;
     const def = PICKUPS[type];
     const ob = { type, amount: rng.int(def.min, def.max), ...p, t: rng.range(0, 6), taken: false };
@@ -106,13 +113,43 @@ export function generateChunk(seed, index) {
 }
 
 function makeBlocker(rng, kind) {
-  const base = { kind, solid: true, seed: rng.int(0, 1e9) };
-  if (kind === 'wreck') {
-    const horizontal = rng.chance(0.5);
-    return { ...base, w: horizontal ? 36 : 20, h: horizontal ? 20 : 36, horizontal, variant: rng.int(0, 2) };
+  const base = { kind, solid: true, seed: rng.int(0, 1e9), flip: rng.chance(0.5) };
+  switch (kind) {
+    case 'wreck': {
+      // police car art is 302x175, seen from the side; vertical = rotated 90°
+      const horizontal = rng.chance(0.6);
+      return { ...base, w: horizontal ? 270 : 140, h: horizontal ? 140 : 270, horizontal };
+    }
+    case 'collapse': {
+      const w = Math.round(rng.range(180, 300));
+      return { ...base, w, h: Math.round(w * 0.72) };
+    }
+    case 'rail':
+      // guardrail art (drawn at a slant in the concept) rotated to lie across the road
+      return { ...base, w: 300, h: 56 };
+    case 'tree':
+      // tree art (≈180 tall) lying across the road
+      return { ...base, art: rng.pick(['tree1', 'tree2']), w: 180, h: 70 };
+    case 'barricade': {
+      const w = Math.round(rng.range(...BLOCKERS.barricade.w));
+      const h = Math.round(rng.range(...BLOCKERS.barricade.h));
+      const pieces = [];
+      for (let i = rng.int(5, 8); i > 0; i--) {
+        pieces.push({
+          art: rng.pick([...ART.barrels, ...ART.tires, 'crate']),
+          dx: rng.range(-w / 2 + 25, w / 2 - 25),
+          dy: rng.range(-h / 2 + 20, h / 2 - 15),
+          flip: rng.chance(0.5),
+        });
+      }
+      pieces.sort((a, b) => a.dy - b.dy);
+      return { ...base, w, h, pieces };
+    }
+    default: {
+      const def = BLOCKERS[kind];
+      return { ...base, w: Math.round(rng.range(...def.w)), h: Math.round(rng.range(...def.h)) };
+    }
   }
-  const def = BLOCKERS[kind];
-  return { ...base, w: Math.round(rng.range(...def.w)), h: Math.round(rng.range(...def.h)) };
 }
 
 /**
@@ -123,7 +160,7 @@ function place(rng, top, solids, w, h, maxX, minX = 0, tries = 12) {
   for (let i = 0; i < tries; i++) {
     const side = rng.chance(0.5) ? 1 : -1;
     const x = minX > 0 ? side * rng.range(minX, maxX) : rng.range(-maxX, maxX);
-    const box = { x, y: top + rng.range(h, CHUNK_H - h), w: w + 6, h: h + 6 };
+    const box = { x, y: top + rng.range(h, CHUNK_H - h), w: w + 20, h: h + 20 };
     if (!solids.some((s) => aabbOverlap(box, s))) return { x: box.x, y: box.y, w, h };
   }
   return null;
@@ -131,31 +168,39 @@ function place(rng, top, solids, w, h, maxX, minX = 0, tries = 12) {
 
 function addCracks(rng, top, out, n) {
   for (let i = 0; i < n; i++) {
-    let x = rng.range(-ROAD_HALF + 6, ROAD_HALF - 6);
-    let y = top + rng.range(0, CHUNK_H);
-    const pts = [[x, y]];
-    let a = rng.range(0, Math.PI * 2);
-    for (let s = rng.int(3, 7); s > 0; s--) {
-      a += rng.range(-0.9, 0.9);
-      const len = rng.range(5, 14);
-      x = clamp(x + Math.cos(a) * len, -ROAD_HALF + 2, ROAD_HALF - 2);
-      y += Math.sin(a) * len;
-      pts.push([x, y]);
-    }
-    out.decals.push({ kind: 'crack', points: pts });
+    out.decals.push({
+      kind: 'art',
+      art: rng.pick(ART.cracks),
+      x: rng.range(-ROAD_HALF + 60, ROAD_HALF - 60),
+      y: top + rng.range(0, CHUNK_H),
+      flip: rng.chance(0.5),
+    });
   }
 }
 
 function addDecor(rng, top, out) {
   for (const side of [-1, 1]) {
-    for (let i = rng.int(1, 3); i > 0; i--) {
+    const weights = Object.fromEntries(
+      Object.entries(DECOR).filter(([, v]) => !v.side || v.side === side).map(([k, v]) => [k, v.weight]),
+    );
+    // walk down the chunk so decor pieces don't pile on top of each other
+    let y = top + rng.range(0, 120);
+    let prev = null;
+    while (y < top + CHUNK_H) {
+      let kind = rng.weighted(weights);
+      if (kind === prev) kind = rng.chance(0.5) ? 'bush' : 'tree1';
+      prev = kind;
+      const half = DECOR[kind].w / 2;
       out.decor.push({
-        kind: rng.weighted({ deadTree: 4, bush: 4, wreckSide: 1, billboard: 1, barrels: 2 }),
-        x: side * rng.range(DRIVE_HALF + 8, DRIVE_HALF + 40),
-        y: top + rng.range(0, CHUNK_H),
+        kind,
+        x: side * (DRIVE_HALF + 40 + half + rng.range(0, 60)),
+        y,
         side,
+        // art is drawn for the left side; mirror it on the right unless it carries text
+        flip: DECOR[kind].side ? false : side > 0 ? !rng.chance(0.2) : rng.chance(0.2),
         seed: rng.int(0, 1e9),
       });
+      y += rng.range(160, 360);
     }
   }
 }

@@ -28,7 +28,7 @@ test('safe chunks have no obstacles, zombies or pickups', () => {
 });
 
 test('the road is always passable: every row leaves a gap wider than the truck', () => {
-  const truckW = 20;
+  const truckW = 150;
   for (let seed = 0; seed < 20; seed++) {
     for (let i = SAFE_CHUNKS; i < 80; i++) {
       const solids = generateChunk(seed, i).obstacles.filter((o) => o.solid);
@@ -45,7 +45,7 @@ test('the road is always passable: every row leaves a gap wider than the truck',
 test('blockers stay near the asphalt, pickups within drivable area', () => {
   for (let i = SAFE_CHUNKS; i < 60; i++) {
     const c = generateChunk(9, i);
-    for (const o of c.obstacles.filter((o) => o.solid)) assert.ok(Math.abs(o.x) + o.w / 2 <= ROAD_HALF + 21);
+    for (const o of c.obstacles.filter((o) => o.solid)) assert.ok(Math.abs(o.x) + o.w / 2 <= ROAD_HALF + 61);
     for (const p of c.pickups) assert.ok(Math.abs(p.x) <= DRIVE_HALF);
   }
 });
@@ -125,4 +125,20 @@ test('long autopilot simulation never throws and keeps entity counts bounded', (
     assert.ok(w.obstacles.length < 200 && w.zombies.length < 200);
   }
   assert.ok(Number.isFinite(w.truck.x) && Number.isFinite(w.truck.y));
+});
+
+test('shotgun kills the nearest zombie, spends shells and reloads from inventory', () => {
+  const save = defaultSave();
+  const w = new World({ save, seed: 3 });
+  w.zombies = [{ x: 0, y: -300, w: 44, h: 80, speed: 0, chaseSpeed: 0, dir: 0, t: 0, dead: false }];
+  w.update(1 / 60, fakeInput([], ['shoot']));
+  assert.equal(w.kills, 1);
+  assert.equal(w.clip, 7);
+
+  w.clip = 0;
+  const reserve = w.inv.ammo;
+  w.update(1 / 60, fakeInput([], ['shoot'])); // empty clip -> starts reloading
+  for (let i = 0; i < 120; i++) w.update(1 / 60, fakeInput());
+  assert.equal(w.clip, 8);
+  assert.equal(w.inv.ammo, reserve - 8);
 });

@@ -9,7 +9,7 @@ export function defaultSave() {
     level: 0,
     runs: 0,
     bestDistance: 0,
-    inventory: { scrap: 0, food: 3, dogFood: 3 },
+    inventory: { scrap: 0, food: 3, dogFood: 3, ammo: 24 },
     upgrades: { engine: 0, armor: 0, tires: 0, ram: 0, tank: 0 },
   };
 }

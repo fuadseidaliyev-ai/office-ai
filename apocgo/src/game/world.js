@@ -7,8 +7,8 @@ import { Particles } from '../engine/particles.js';
 import { aabbOverlap, aabbPenetration, circleRectOverlap, clamp } from '../engine/math.js';
 import { RNG } from '../engine/rng.js';
 import {
-  VIEW_W, VIEW_H, CHUNK_H, DRIVE_HALF, ROAD_HALF, PX_PER_METER, SURVIVAL, ZOMBIE, PICKUPS,
-  computeTruckStats, goalMeters,
+  ART, VIEW_W, VIEW_H, CHUNK_H, DRIVE_HALF, PIXEL, ROAD_HALF, PX_PER_METER, SHOTGUN, SURVIVAL,
+  ZOMBIE, PICKUPS, computeTruckStats, goalMeters,
 } from './config.js';
 import { generateChunk } from './generator.js';
 import { Truck } from './truck.js';
@@ -25,20 +25,30 @@ export class World {
 
     this.truck = new Truck(computeTruckStats(save.upgrades));
     this.camera = new Camera(VIEW_W, VIEW_H);
+    this.camera.shakeScale = PIXEL;
     this.camera.snap(0, this.truck.y - VIEW_H * 0.2);
-    this.particles = new Particles();
+    this.particles = new Particles(900, PIXEL);
 
     this.obstacles = [];
     this.zombies = [];
     this.pickups = [];
     this.decals = [{ kind: 'finish', y: this.goalY }];
-    this.decor = [{ kind: 'tower', x: ROAD_HALF + 70, y: this.goalY - 30 }];
+    this.decor = [{ kind: 'tower', x: DRIVE_HALF + 180, y: this.goalY - 100 }];
     this.nextChunk = 0;
 
     this.startInv = { ...save.inventory };
     this.inv = { ...save.inventory };
-    this.gained = { scrap: 0, food: 0, dogFood: 0, fuel: 0 };
+    this.gained = { scrap: 0, food: 0, dogFood: 0, fuel: 0, ammo: 0 };
     this.kills = 0;
+    this.fuelPicked = 0; // canisters found (objective)
+
+    // shotgun: the clip is topped up for free at the start of a run, reloads use inv.ammo
+    this.clip = SHOTGUN.clip;
+    this.inv.ammo = this.inv.ammo ?? 0;
+    this.gunCooldown = 0;
+    this.reloadT = 0;
+    this.shots = []; // tracers {x1, y1, x2, y2, t}
+    this.muzzle = 0;
 
     this.satiety = 100;
     this.dogSatiety = 100;
@@ -81,7 +91,7 @@ export class World {
     while (-this.nextChunk * CHUNK_H > this.camera.top - CHUNK_H) {
       const c = generateChunk(this.seed, this.nextChunk++);
       // nothing spawns past the finish line
-      const beforeGoal = (e) => e.y > this.goalY + 40;
+      const beforeGoal = (e) => e.y > this.goalY + 150;
       this.obstacles.push(...c.obstacles.filter(beforeGoal));
       this.zombies.push(...c.zombies.filter(beforeGoal));
       this.pickups.push(...c.pickups.filter(beforeGoal));
@@ -91,7 +101,7 @@ export class World {
   }
 
   cull() {
-    const limit = this.camera.bottom + 80;
+    const limit = this.camera.bottom + 300;
     const keep = (e) => e.y < limit;
     this.obstacles = this.obstacles.filter(keep);
     this.zombies = this.zombies.filter((z) => !z.dead && z.y < limit + 60);
@@ -103,7 +113,7 @@ export class World {
   // ------------------------------------------------------------ main update
 
   /** Attract mode for the title screen: the camera drifts up the road by itself. */
-  ambient(dt, speed = 45) {
+  ambient(dt, speed = 160) {
     this.camera.y -= speed * dt;
     this.camera.update(dt);
     this.particles.update(dt);
@@ -118,6 +128,9 @@ export class World {
     this.hitFlash = Math.max(0, this.hitFlash - dt * 3);
     for (const t of this.toasts) t.t -= dt;
     this.toasts = this.toasts.filter((t) => t.t > 0);
+    for (const s of this.shots) s.t -= dt;
+    this.shots = this.shots.filter((s) => s.t > 0);
+    this.muzzle = Math.max(0, this.muzzle - dt);
     if (this.state !== 'running') return;
 
     this.time += dt;
@@ -125,18 +138,19 @@ export class World {
     truck.update(dt, input);
 
     this.updateSurvival(dt, input);
+    this.updateGun(dt, input);
     this.updateZombies(dt);
     this.collideObstacles();
     this.collectPickups();
 
-    if (truck.offroad && Math.abs(truck.speed) > 30 && this.rng.chance(0.5)) {
-      this.particles.emit(truck.x + this.rng.range(-8, 8), truck.y + 18, {
+    if (truck.offroad && Math.abs(truck.speed) > 100 && this.rng.chance(0.6)) {
+      this.particles.emit(truck.x + this.rng.range(-70, 70), truck.y + 150, {
         count: 1, colors: ['#8a6a48', '#7a5a3a'], speed: 20, angle: Math.PI / 2, spread: 1, life: 0.5,
       });
     }
 
-    const lookAhead = clamp(truck.speed, 0, 400) * 0.18;
-    this.camera.follow(truck.x * 0.35, truck.y - VIEW_H * 0.2 - lookAhead, dt, 6);
+    const lookAhead = clamp(truck.speed, 0, 900) * 0.3;
+    this.camera.follow(truck.x * 0.3, truck.y - VIEW_H * 0.12 - lookAhead, dt, 5);
     this.ensureChunks();
     this.cull();
     this.checkEnd(dt);
@@ -199,7 +213,8 @@ export class World {
         z.y += Math.sin(z.dir) * z.speed * 0.5 * dt;
         z.moving = true;
       }
-      z.x = clamp(z.x, -DRIVE_HALF - 10, DRIVE_HALF + 10);
+      z.x = clamp(z.x, -DRIVE_HALF - 30, DRIVE_HALF + 30);
+      if (Math.abs(z.x - ox) > 0.01) z.face = z.x > ox ? 1 : -1;
       // zombies don't walk through blockers
       for (const ob of this.obstacles) {
         if (ob.solid && aabbOverlap(z, ob)) {
@@ -233,14 +248,77 @@ export class World {
     }
   }
 
-  killZombie(z) {
+  killZombie(z, angle = -Math.PI / 2) {
     z.dead = true;
     this.kills++;
     this.particles.emit(z.x, z.y, {
-      count: 14, colors: ['#8b1e14', '#6b1a14', '#a7a88a'], speed: 90,
-      angle: -Math.PI / 2, spread: 2.5, life: 0.5,
+      count: 18, colors: ['#8b1e14', '#6b1a14', '#4a100c', '#9a8a70'], speed: 90,
+      angle, spread: 2.2, life: 0.55,
     });
-    this.decals.push({ kind: 'blood', x: z.x, y: z.y, seed: this.rng.int(0, 1e9) });
+    this.decals.push({ kind: 'art', art: this.rng.pick(ART.blood), x: z.x, y: z.y + 20, flip: this.rng.chance(0.5) });
+  }
+
+  // ------------------------------------------------------------ shotgun
+
+  updateGun(dt, input) {
+    this.gunCooldown = Math.max(0, this.gunCooldown - dt);
+    if (this.reloadT > 0) {
+      this.reloadT -= dt;
+      if (this.reloadT <= 0) {
+        const n = Math.min(SHOTGUN.clip - this.clip, this.inv.ammo);
+        this.clip += n;
+        this.inv.ammo -= n;
+      }
+      return;
+    }
+    if (input.pressed('reload')) return this.startReload();
+    if (!input.pressed('shoot')) return;
+    if (this.clip <= 0) return this.startReload();
+    if (this.gunCooldown > 0) return;
+    this.shoot();
+  }
+
+  startReload() {
+    if (this.reloadT > 0 || this.clip >= SHOTGUN.clip) return;
+    if (this.inv.ammo <= 0) return this.toast('Нет патронов', '#c9745a');
+    this.reloadT = SHOTGUN.reload;
+    this.toast('Перезарядка…', '#b9c3cc');
+  }
+
+  /** The driver fires at the nearest zombie in range (or straight ahead if none). */
+  target() {
+    const t = this.truck;
+    let best = null;
+    let bestD = SHOTGUN.range ** 2;
+    for (const z of this.zombies) {
+      if (z.dead) continue;
+      const d = (z.x - t.x) ** 2 + (z.y - t.y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = z;
+      }
+    }
+    return best;
+  }
+
+  shoot() {
+    const t = this.truck;
+    const ox = t.x;
+    const oy = t.y - t.h * 0.1; // the cab
+    const z = this.target();
+    const tx = z ? z.x : ox;
+    const ty = z ? z.y : oy - SHOTGUN.range;
+    const angle = Math.atan2(ty - oy, tx - ox);
+    this.clip--;
+    this.gunCooldown = SHOTGUN.cooldown;
+    this.muzzle = 0.08;
+    this.shots.push({ x1: ox, y1: oy, x2: tx, y2: ty, t: 0.12 });
+    this.camera.shake(1.5, 0.1);
+    this.particles.emit(ox + Math.cos(angle) * 40, oy + Math.sin(angle) * 40, {
+      count: 8, colors: ['#fff2b0', '#ffd36b', '#ff9d3a'], speed: 120, angle, spread: 0.6, life: 0.2,
+    });
+    if (z) this.killZombie(z, angle);
+    if (this.clip === 0) this.startReload();
   }
 
   collideObstacles() {
@@ -250,7 +328,7 @@ export class World {
       if (ob.kind === 'pothole') {
         if (ob.hit || !circleRectOverlap(ob.x, ob.y, ob.r * 0.8, tb)) continue;
         ob.hit = true;
-        truck.damage(2 + Math.abs(truck.speed) / 40);
+        truck.damage(2 + Math.abs(truck.speed) / 130);
         truck.speed *= 0.75;
         truck.slow = 0.8;
         this.camera.shake(2.5, 0.2);
@@ -276,12 +354,12 @@ export class World {
         // head-on (or reversing into it)
         truck.y += pen.y * pen.sy;
         const impact = Math.abs(truck.speed);
-        if (impact > 20 && truck.invuln <= 0) {
-          const dmg = impact * (ob.kind === 'collapse' ? 0.16 : 0.12);
+        if (impact > 70 && truck.invuln <= 0) {
+          const dmg = impact * (ob.kind === 'collapse' ? 0.048 : 0.036);
           truck.damage(dmg);
           truck.invuln = 0.5;
           this.hitFlash = 1;
-          this.camera.shake(Math.min(7, impact / 22), 0.3);
+          this.camera.shake(Math.min(7, impact / 70), 0.3);
           this.particles.emit(truck.x, truck.y - truck.h / 2 * pen.sy, {
             count: 16, colors: ['#ffd36b', '#ff9d3a', '#6f6861'], speed: 110,
             angle: pen.sy > 0 ? -Math.PI / 2 : Math.PI / 2, spread: 2.2, life: 0.4,
@@ -294,7 +372,7 @@ export class World {
         truck.x += pen.x * pen.sx;
         truck.vx = 0;
         truck.speed *= 0.98;
-        if (Math.abs(truck.speed) > 40 && this.rng.chance(0.3)) {
+        if (Math.abs(truck.speed) > 130 && this.rng.chance(0.3)) {
           this.particles.emit(truck.x - (truck.w / 2) * pen.sx, truck.y, {
             count: 2, colors: ['#ffd36b', '#ff9d3a'], speed: 50, life: 0.25,
           });
@@ -311,10 +389,12 @@ export class World {
       const name = PICKUPS[p.type].name;
       if (p.type === 'fuel') {
         this.truck.fuel = Math.min(this.truck.stats.maxFuel, this.truck.fuel + p.amount);
+        this.fuelPicked++;
         this.toast(`+${p.amount} ${name}`, '#ffcf4a');
       } else {
         this.inv[p.type] += p.amount;
-        this.toast(`+${p.amount} ${name}`, p.type === 'scrap' ? '#b9c3cc' : p.type === 'food' ? '#9fdc6a' : '#f0a24a');
+        const colors = { scrap: '#b9c3cc', food: '#9fdc6a', dogFood: '#f0a24a', ammo: '#e0b25a' };
+        this.toast(`+${p.amount} ${name}`, colors[p.type]);
       }
       this.gained[p.type] += p.amount;
       this.particles.emit(p.x, p.y, { count: 10, colors: ['#fff2b0', '#ffd36b'], speed: 50, life: 0.5 });
@@ -331,7 +411,7 @@ export class World {
     if (t.hp <= 0) return this.end('lost', 'Машина разбита');
     if (this.dogStarve > SURVIVAL.starveLimit) return this.end('lost', 'Собака погибла от голода');
     if (this.starve > SURVIVAL.starveLimit) return this.end('lost', 'Водитель умер от голода');
-    this.stall = t.fuel <= 0 && Math.abs(t.speed) < 5 ? this.stall + dt : 0;
+    this.stall = t.fuel <= 0 && Math.abs(t.speed) < 15 ? this.stall + dt : 0;
     if (this.stall > SURVIVAL.noFuelLimit) return this.end('lost', 'Кончилось топливо');
   }
 

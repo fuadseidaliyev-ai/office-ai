@@ -1,6 +1,6 @@
 // Text helpers for the UI layer (virtual coordinates, crisp at any scale).
 
-export const FONT = "'VT323', 'Courier New', monospace";
+export const FONT = "'Exo 2', 'Segoe UI', Roboto, sans-serif";
 
 export function text(ctx, str, x, y, {
   size = 10, color = '#e8dcc0', align = 'left', baseline = 'top', shadow = true, bold = false,

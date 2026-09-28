@@ -1,10 +1,13 @@
-// ApocGo bootstrap: wires the engine (loop, input, renderer, scenes) to the game.
+// ApocGo bootstrap: loads the art, then wires the engine (loop, input, renderer,
+// scenes) to the game.
 
+import { loadImages } from './engine/assets.js';
 import { GameLoop } from './engine/loop.js';
 import { Input } from './engine/input.js';
 import { Renderer } from './engine/renderer.js';
 import { SceneManager } from './engine/scene.js';
-import { VIEW_W, VIEW_H } from './game/config.js';
+import { ART_FILES, setArt } from './game/art.js';
+import { VIEW_W, VIEW_H, UI_W, UI_H } from './game/config.js';
 import { loadSave, writeSave } from './game/save.js';
 import { MenuScene } from './scenes/menu.js';
 import { PlayScene } from './scenes/play.js';
@@ -19,12 +22,13 @@ const SCENES = {
 };
 
 const canvas = document.getElementById('game');
+const loading = document.getElementById('loading');
 
 const game = {
   debug: false,
   save: loadSave(),
-  renderer: new Renderer(canvas, VIEW_W, VIEW_H),
-  input: new Input(window, { width: VIEW_W, height: VIEW_H }),
+  renderer: new Renderer(canvas, VIEW_W, VIEW_H, UI_W, UI_H),
+  input: new Input(window, { width: UI_W, height: UI_H }),
   persist() {
     writeSave(this.save);
   },
@@ -41,6 +45,13 @@ game.loop = new GameLoop({
   },
   render: () => game.scenes.render(game.renderer),
 });
+
+const images = await loadImages(ART_FILES, './assets/', (n, total) => {
+  if (loading) loading.textContent = `Загрузка… ${Math.round((n / total) * 100)}%`;
+});
+setArt(images);
+await document.fonts?.ready;
+loading?.remove();
 
 game.go('menu');
 game.loop.start();

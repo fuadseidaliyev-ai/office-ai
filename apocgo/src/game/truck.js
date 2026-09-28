@@ -8,8 +8,8 @@ export class Truck {
     this.stats = stats;
     this.x = 0;
     this.y = 0;
-    this.w = 20;
-    this.h = 38;
+    this.w = 150; // hitbox; the art is 195x325
+    this.h = 300;
     this.speed = 0;
     this.vx = 0;
     this.tilt = 0;
@@ -44,11 +44,11 @@ export class Truck {
     else this.speed = approach(this.speed, 0, s.drag * dt);
     if (this.braking) this.speed -= s.brake * dt;
     const max = this.maxSpeedNow;
-    if (this.speed > max) this.speed = approach(this.speed, max, 160 * dt);
-    this.speed = clamp(this.speed, -40, s.maxSpeed * 1.2);
+    if (this.speed > max) this.speed = approach(this.speed, max, 550 * dt);
+    this.speed = clamp(this.speed, -130, s.maxSpeed * 1.2);
 
     // Lateral: steering authority grows with speed, never zero so you can wiggle free.
-    const authority = clamp(Math.abs(this.speed) / 60, 0.25, 1);
+    const authority = clamp(Math.abs(this.speed) / 200, 0.25, 1);
     const targetVx = steer * s.handling * authority;
     this.vx += (targetVx - this.vx) * damp(this.offroad ? 6 : 10, dt);
 
@@ -59,7 +59,7 @@ export class Truck {
       this.vx = 0;
     }
 
-    this.tilt += ((this.vx / s.handling) * 0.3 - this.tilt) * damp(12, dt);
+    this.tilt += ((this.vx / s.handling) * 0.18 - this.tilt) * damp(12, dt);
 
     // Fuel.
     const load = this.throttle * clamp(this.speed / s.maxSpeed, 0.3, 1);

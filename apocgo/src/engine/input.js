@@ -7,8 +7,10 @@ export const DEFAULT_BINDINGS = {
   gas: ['ArrowUp', 'KeyW'],
   brake: ['ArrowDown', 'KeyS'],
   eat: ['KeyE'],
+  shoot: ['Space', 'KeyF'],
+  reload: ['KeyR'],
   feedDog: ['KeyQ'],
-  confirm: ['Enter', 'Space'],
+  confirm: ['Enter'],
   back: ['Escape', 'Backspace'],
   pause: ['KeyP', 'Escape'],
   garage: ['KeyG'],
@@ -27,6 +29,8 @@ export class Input {
     this.pressedKeys = new Set();
     this.touches = new Map(); // pointerId -> { x, y } in virtual coords
     this.touchTapped = false;
+    this.touchShot = false;
+    this.tap = null; // {x, y} of a touch/click that started this step (virtual coords)
     this.virtualW = width;
     this.virtualH = height;
     this._canvas = null;
@@ -51,10 +55,19 @@ export class Input {
       };
     };
     canvas.addEventListener('pointerdown', (e) => {
-      if (e.pointerType === 'mouse') return;
+      const p = toVirtual(e);
+      this.tap = p;
+      if (e.pointerType === 'mouse') {
+        // clicks confirm in menus and fire the shotgun in a run, but don't drive
+        this.touchTapped = true;
+        this.touchShot = true;
+        return;
+      }
       canvas.setPointerCapture?.(e.pointerId);
-      this.touches.set(e.pointerId, toVirtual(e));
+      this.touches.set(e.pointerId, p);
       this.touchTapped = true;
+      // tapping the middle third fires the shotgun
+      if (p.x > this.virtualW / 3 && p.x < (this.virtualW * 2) / 3) this.touchShot = true;
     });
     canvas.addEventListener('pointermove', (e) => {
       if (this.touches.has(e.pointerId)) this.touches.set(e.pointerId, toVirtual(e));
@@ -90,7 +103,13 @@ export class Input {
   pressed(action) {
     const codes = this.bindings[action] || [];
     for (const c of codes) if (this.pressedKeys.has(c)) return true;
-    return action === 'confirm' && this.touchTapped;
+    return (action === 'confirm' && this.touchTapped) || (action === 'shoot' && this.touchShot);
+  }
+
+  /** Did a tap/click this step land inside the rectangle (virtual coords)? */
+  tapIn(x, y, w, h) {
+    const t = this.tap;
+    return !!t && t.x >= x && t.x <= x + w && t.y >= y && t.y <= y + h;
   }
 
   /** -1..1 from two opposing actions. */
@@ -102,5 +121,7 @@ export class Input {
   endStep() {
     this.pressedKeys.clear();
     this.touchTapped = false;
+    this.touchShot = false;
+    this.tap = null;
   }
 }

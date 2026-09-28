@@ -1,12 +1,14 @@
 // Two-layer renderer:
-//  * `ctx`  — a low-resolution buffer (e.g. 480x270) for the pixel-art world.
-//  * `ui`   — the full-resolution display canvas, pre-scaled so UI code also works in
-//             virtual coordinates but text stays crisp.
+//  * `ctx`  — a fixed-size buffer for the world (the camera's view in world units).
+//  * `ui`   — the full-resolution display canvas, pre-scaled so UI code works in its own
+//             small virtual resolution (uiW x uiH) while text stays crisp.
 
 export class Renderer {
-  constructor(canvas, width, height) {
+  constructor(canvas, width, height, uiW = width, uiH = height) {
     this.W = width;
     this.H = height;
+    this.uiW = uiW;
+    this.uiH = uiH;
     this.display = canvas;
     this.dctx = canvas.getContext('2d');
 
@@ -31,6 +33,7 @@ export class Renderer {
     this.display.width = Math.round(cssW * dpr);
     this.display.height = Math.round(cssH * dpr);
     this.scale = this.display.width / this.W;
+    this.uiScale = this.display.width / this.uiW;
   }
 
   beginFrame() {
@@ -45,9 +48,11 @@ export class Renderer {
   present() {
     const d = this.dctx;
     d.setTransform(1, 0, 0, 1, 0, 0);
-    d.imageSmoothingEnabled = false;
+    // painterly art: smooth when the buffer is scaled down, crisp when scaled up
+    d.imageSmoothingEnabled = this.scale < 1;
+    d.imageSmoothingQuality = 'high';
     d.drawImage(this.buffer, 0, 0, this.display.width, this.display.height);
-    d.setTransform(this.scale, 0, 0, this.scale, 0, 0);
+    d.setTransform(this.uiScale, 0, 0, this.uiScale, 0, 0);
     d.imageSmoothingEnabled = true;
   }
 

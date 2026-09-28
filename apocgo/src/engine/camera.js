@@ -11,6 +11,7 @@ export class Camera {
     this.shakeMag = 0;
     this.ox = 0;
     this.oy = 0;
+    this.shakeScale = 1; // world units per "shake pixel"
   }
 
   follow(tx, ty, dt, rate = 8) {
@@ -25,7 +26,7 @@ export class Camera {
   }
 
   shake(magnitude, time = 0.25) {
-    this.shakeMag = Math.max(this.shakeMag, magnitude);
+    this.shakeMag = Math.max(this.shakeMag, magnitude * this.shakeScale);
     this.shakeTime = Math.max(this.shakeTime, time);
   }
 
