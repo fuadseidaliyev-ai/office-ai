@@ -1,0 +1,21 @@
+name: apocgo
+
+on:
+  push:
+    branches: ["**"]
+    paths: ["apocgo/**", ".github/workflows/apocgo.yml"]
+  pull_request:
+    paths: ["apocgo/**", ".github/workflows/apocgo.yml"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apocgo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm test
