@@ -9,19 +9,38 @@ const PANEL = 'rgba(14,12,10,0.72)';
 const BORDER = 'rgba(210,200,180,0.16)';
 const INK = '#e9e4d8';
 
-export function drawHud(ui, world, { fps = 0, debug = false } = {}) {
+/**
+ * Panel positions. With on-screen driving buttons (`touch`) the vitals and weapon
+ * panels move up under the objectives / compass so the bottom corners are free.
+ */
+export function hudLayout(touch) {
+  return {
+    vitalsY: touch ? 56 : UI_H - 48,
+    weaponY: touch ? 68 : UI_H - 30,
+    toastY: touch ? 28 : 14,
+  };
+}
+
+/** Rects of the tappable food / dog-food rows (UI coords). */
+export function vitalsRows(touch) {
+  const { vitalsY } = hudLayout(touch);
+  return { food: [4, vitalsY + 22, 92, 10], dogFood: [4, vitalsY + 32, 92, 10] };
+}
+
+export function drawHud(ui, world, { fps = 0, debug = false, touch = false } = {}) {
   const t = world.truck;
   const blink = Math.floor(world.time * 4) % 2 === 0;
+  const layout = hudLayout(touch);
 
   drawObjectives(ui, world);
   drawCompass(ui, world);
-  drawVitals(ui, world, blink);
-  drawWeapon(ui, world);
+  drawVitals(ui, world, blink, layout.vitalsY);
+  drawWeapon(ui, world, layout.weaponY);
 
   // toasts (top-centre)
   world.toasts.forEach((toast, i) => {
     ui.globalAlpha = Math.min(1, toast.t * 2);
-    text(ui, toast.text, UI_W / 2, 14 + i * 11, { size: 9, align: 'center', color: toast.color, bold: true });
+    text(ui, toast.text, UI_W / 2, layout.toastY + i * 11, { size: 9, align: 'center', color: toast.color, bold: true });
     ui.globalAlpha = 1;
   });
 
@@ -138,10 +157,9 @@ function drawCompass(ui, world) {
 
 // ------------------------------------------------------------ vitals (bottom-left)
 
-function drawVitals(ui, world, blink) {
+function drawVitals(ui, world, blink, y) {
   const t = world.truck;
   const x = 4;
-  const y = UI_H - 48;
   panel(ui, x, y, 92, 44);
   const rows = [
     [iconCross, '#c8433a', t.hp / t.stats.maxHp],
@@ -216,11 +234,10 @@ function iconPaw(ui, x, y, c) {
 
 // ------------------------------------------------------------ shotgun (bottom-right)
 
-function drawWeapon(ui, world) {
+function drawWeapon(ui, world, y) {
   const w = 64;
   const h = 26;
   const x = UI_W - w - 4;
-  const y = UI_H - h - 4;
   panel(ui, x, y, w, h);
   if (art.shotgun) {
     const s = (w - 8) / art.shotgun.width;

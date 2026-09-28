@@ -22,6 +22,21 @@
     canvas {
       display: block;
     }
+    #rotate {
+      display: none;
+      position: fixed;
+      inset: 0;
+      align-items: center;
+      justify-content: center;
+      padding: 0 24px;
+      text-align: center;
+      background: rgba(11, 8, 6, 0.92);
+      color: #e0b25a;
+      font: 18px 'Exo 2', 'Segoe UI', Roboto, sans-serif;
+    }
+    @media (orientation: portrait) and (pointer: coarse) {
+      #rotate { display: flex; }
+    }
     #loading {
       position: fixed;
       inset: 0;
@@ -36,6 +51,7 @@
 <body>
   <canvas id="game"></canvas>
   <div id="loading">Загрузка…</div>
+  <div id="rotate">Поверните телефон горизонтально ↻</div>
   <script type="module" src="./src/main.js"></script>
 </body>
 </html>

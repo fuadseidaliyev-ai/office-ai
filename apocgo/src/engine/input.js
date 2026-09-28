@@ -15,6 +15,7 @@ export const DEFAULT_BINDINGS = {
   pause: ['KeyP', 'Escape'],
   garage: ['KeyG'],
   debug: ['F3'],
+  touchUI: ['KeyT'],
   opt1: ['Digit1', 'Numpad1'],
   opt2: ['Digit2', 'Numpad2'],
   opt3: ['Digit3', 'Numpad3'],
@@ -31,6 +32,10 @@ export class Input {
     this.touchTapped = false;
     this.touchShot = false;
     this.tap = null; // {x, y} of a touch/click that started this step (virtual coords)
+    // On-screen buttons: [{ action, x, y, w, h }] in virtual coords. While any are set,
+    // touches only act through them (no screen-zone steering).
+    this.buttons = [];
+    this.pressedButtons = new Set();
     this.virtualW = width;
     this.virtualH = height;
     this._canvas = null;
@@ -44,7 +49,29 @@ export class Input {
     target.addEventListener('blur', () => this.keys.clear());
   }
 
-  /** Enable simple touch controls on the canvas: left/right thirds steer, any touch = gas. */
+  /** Replace the on-screen buttons (pass [] to remove them). */
+  setButtons(buttons) {
+    this.buttons = buttons;
+  }
+
+  buttonAt(p) {
+    for (const b of this.buttons) {
+      if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) return b;
+    }
+    return null;
+  }
+
+  /** Is a finger (or mouse) currently holding this button? */
+  isButtonHeld(button) {
+    for (const t of this.touches.values()) if (this.buttonAt(t) === button) return true;
+    return false;
+  }
+
+  /**
+   * Pointer controls on the canvas. With on-screen buttons set, fingers (and the mouse)
+   * press those buttons — several at once, sliding between them works. Without buttons:
+   * left/right thirds steer, any touch = gas, a tap in the middle fires.
+   */
   attachTouch(canvas) {
     this._canvas = canvas;
     const toVirtual = (e) => {
@@ -56,6 +83,14 @@ export class Input {
     };
     canvas.addEventListener('pointerdown', (e) => {
       const p = toVirtual(e);
+      const button = this.buttonAt(p);
+      if (button) {
+        canvas.setPointerCapture?.(e.pointerId);
+        this.touches.set(e.pointerId, p);
+        this.pressedButtons.add(button.action);
+        e.preventDefault();
+        return;
+      }
       this.tap = p;
       if (e.pointerType === 'mouse') {
         // clicks confirm in menus and fire the shotgun in a run, but don't drive
@@ -66,8 +101,8 @@ export class Input {
       canvas.setPointerCapture?.(e.pointerId);
       this.touches.set(e.pointerId, p);
       this.touchTapped = true;
-      // tapping the middle third fires the shotgun
-      if (p.x > this.virtualW / 3 && p.x < (this.virtualW * 2) / 3) this.touchShot = true;
+      // no on-screen buttons: tapping the middle third fires the shotgun
+      if (!this.buttons.length && p.x > this.virtualW / 3 && p.x < (this.virtualW * 2) / 3) this.touchShot = true;
     });
     canvas.addEventListener('pointermove', (e) => {
       if (this.touches.has(e.pointerId)) this.touches.set(e.pointerId, toVirtual(e));
@@ -84,6 +119,10 @@ export class Input {
 
   _touchAction(action) {
     if (this.touches.size === 0) return false;
+    if (this.buttons.length) {
+      for (const t of this.touches.values()) if (this.buttonAt(t)?.action === action) return true;
+      return false;
+    }
     if (action === 'gas') return true;
     for (const t of this.touches.values()) {
       if (action === 'left' && t.x < this.virtualW / 3) return true;
@@ -103,6 +142,7 @@ export class Input {
   pressed(action) {
     const codes = this.bindings[action] || [];
     for (const c of codes) if (this.pressedKeys.has(c)) return true;
+    if (this.pressedButtons.has(action)) return true;
     return (action === 'confirm' && this.touchTapped) || (action === 'shoot' && this.touchShot);
   }
 
@@ -123,5 +163,6 @@ export class Input {
     this.touchTapped = false;
     this.touchShot = false;
     this.tap = null;
+    this.pressedButtons.clear();
   }
 }
