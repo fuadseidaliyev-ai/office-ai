@@ -133,8 +133,6 @@ export const SHOTGUN = {
 export const SPAWN = {
   difficultyChunks: 60, // chunks until difficulty reaches 1
   zombies: (d) => [Math.round(1 + d * 3), Math.round(2 + d * 6)],
-  potholes: (d) => [1, Math.round(2 + d * 3)],
-  smallDebris: (d) => [0, Math.round(1 + d * 3)],
   blockerChance: (d) => 0.35 + d * 0.45, // per band (3 bands per chunk)
   pickupChance: { scrap: 0.22, food: 0.08, dogFood: 0.08, fuel: 0.1, ammo: 0.1 },
   graffitiChance: 0.15,

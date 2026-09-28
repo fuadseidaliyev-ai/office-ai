@@ -5,7 +5,7 @@
 import { BUFFER_W, BUFFER_H, OBSTACLE_SCALE as S, PIXEL, ROAD_HALF } from './config.js';
 import { art } from './art.js';
 import {
-  bushSprite, holeSprite, paintSprite, pickupSprite, radioTowerSprite, vignette,
+  bushSprite, paintSprite, pickupSprite, radioTowerSprite, vignette,
 } from './sprites.js';
 
 let patterns = null;
@@ -26,11 +26,58 @@ const noise = (n) => {
   return s - Math.floor(s);
 };
 
-/** Draw an art image centred at (x, y). */
-function drawArt(ctx, name, x, y, { flip = false, rot = 0, scale = 1, w = 0 } = {}) {
+// Obstacles get a warm hazard outline + tint so they read clearly against the grey
+// asphalt; the one just hit flashes red. Variants are rendered once and cached.
+const HAZARD = {
+  normal: { outline: 'rgba(255,138,42,0.9)', tint: 'rgba(255,120,40,0.16)' },
+  hit: { outline: 'rgba(255,40,30,1)', tint: 'rgba(255,40,30,0.45)' },
+};
+const HAZARD_PAD = 6; // outline thickness in art pixels
+const hazardCache = new Map();
+
+function hazardImage(name, variant) {
+  const key = `${name}:${variant}`;
+  if (hazardCache.has(key)) return hazardCache.get(key);
   const img = art[name];
+  const pad = HAZARD_PAD;
+  const { outline, tint } = HAZARD[variant];
+  // coloured silhouette
+  const sil = document.createElement('canvas');
+  sil.width = img.width;
+  sil.height = img.height;
+  const sg = sil.getContext('2d');
+  sg.drawImage(img, 0, 0);
+  sg.globalCompositeOperation = 'source-in';
+  sg.fillStyle = outline;
+  sg.fillRect(0, 0, sil.width, sil.height);
+  // outline = silhouette stamped around the sprite, then the tinted sprite on top
+  const c = document.createElement('canvas');
+  c.width = img.width + pad * 2;
+  c.height = img.height + pad * 2;
+  const g = c.getContext('2d');
+  for (let a = 0; a < 16; a++) {
+    const t = (a / 16) * Math.PI * 2;
+    g.drawImage(sil, pad + Math.cos(t) * pad, pad + Math.sin(t) * pad);
+  }
+  const body = document.createElement('canvas');
+  body.width = img.width;
+  body.height = img.height;
+  const bg = body.getContext('2d');
+  bg.drawImage(img, 0, 0);
+  bg.globalCompositeOperation = 'source-atop';
+  bg.fillStyle = tint;
+  bg.fillRect(0, 0, body.width, body.height);
+  g.drawImage(body, pad, pad);
+  hazardCache.set(key, c);
+  return c;
+}
+
+/** Draw an art image centred at (x, y). `hazard`: 'normal' | 'hit' adds the obstacle outline. */
+function drawArt(ctx, name, x, y, { flip = false, rot = 0, scale = 1, w = 0, hazard = null } = {}) {
+  let img = art[name];
   if (!img) return;
   const s = w ? w / img.width : scale;
+  if (hazard) img = hazardImage(name, hazard);
   const dw = img.width * s;
   const dh = img.height * s;
   if (!flip && !rot) {
@@ -80,21 +127,29 @@ export function drawWorld(ctx, world, { hideTruck = false, debug = false } = {})
   // ground-level decals (cracks, graffiti, blood)
   for (const d of world.decals) drawDecal(ctx, d);
 
-  // holes are part of the road surface
+  // collapses are part of the road surface: art + a hazard ring around the hole
   for (const ob of world.obstacles) {
-    if (ob.kind === 'pothole') {
-      const d = Math.max(4, Math.round((ob.r * 2) / PIXEL));
-      drawPixel(ctx, holeSprite(d, d, ob.seed), ob.x, ob.y);
-    } else if (ob.kind === 'collapse') {
-      drawArt(ctx, 'collapse', ob.x, ob.y, { w: ob.w * 1.25, flip: ob.flip });
+    if (ob.kind !== 'collapse') continue;
+    drawArt(ctx, 'collapse', ob.x, ob.y, { w: ob.w * 1.25, flip: ob.flip });
+    const hit = isFlashing(world, ob);
+    ctx.strokeStyle = hit ? 'rgba(255,40,30,0.95)' : 'rgba(255,138,42,0.8)';
+    ctx.lineWidth = 5;
+    ctx.setLineDash([22, 12]);
+    ctx.beginPath();
+    ctx.ellipse(ob.x, ob.y, ob.w * 0.56, ob.h * 0.58, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (hit) {
+      ctx.fillStyle = 'rgba(255,40,30,0.25)';
+      ctx.fill();
     }
   }
 
   for (const pk of world.pickups) drawPickup(ctx, pk, world.time);
 
   for (const ob of world.obstacles) {
-    if (ob.kind === 'pothole' || ob.kind === 'collapse') continue;
-    drawObstacle(ctx, ob);
+    if (ob.kind === 'collapse') continue;
+    drawObstacle(ctx, ob, isFlashing(world, ob) ? 'hit' : 'normal');
   }
 
   // zombies — sorted by y so lower ones overlap upper ones
@@ -212,30 +267,30 @@ function drawPickup(ctx, pk, time) {
   else drawPixel(ctx, pickupSprite(pk.type), pk.x, pk.y - bob, PIXEL + 1);
 }
 
-function drawObstacle(ctx, ob) {
+/** The obstacle the truck just hit blinks red for a moment. */
+function isFlashing(world, ob) {
+  const t = world.time - (ob.hitAt ?? -99);
+  return t < 0.7 && Math.floor(t * 10) % 2 === 0;
+}
+
+function drawObstacle(ctx, ob, hazard) {
   switch (ob.kind) {
     case 'barricade':
       shadow(ctx, ob.x + 6, ob.y + 12, ob.w * 0.55, ob.h * 0.55, 0.3);
-      for (const p of ob.pieces) drawArt(ctx, p.art, ob.x + p.dx, ob.y + p.dy, { flip: p.flip, scale: S });
+      for (const p of ob.pieces) drawArt(ctx, p.art, ob.x + p.dx, ob.y + p.dy, { flip: p.flip, scale: S, hazard });
       break;
     case 'wreck':
       shadow(ctx, ob.x + 8, ob.y + 14, ob.w * 0.55, ob.h * 0.5, 0.3);
       // never mirrored: the art has "POLICE" lettering
-      if (ob.horizontal) drawArt(ctx, 'police', ob.x, ob.y, { scale: S });
-      else drawArt(ctx, 'police', ob.x, ob.y, { rot: ob.flip ? Math.PI / 2 : -Math.PI / 2, scale: S });
+      if (ob.horizontal) drawArt(ctx, 'police', ob.x, ob.y, { scale: S, hazard });
+      else drawArt(ctx, 'police', ob.x, ob.y, { rot: ob.flip ? Math.PI / 2 : -Math.PI / 2, scale: S, hazard });
       break;
     case 'rail':
       shadow(ctx, ob.x + 6, ob.y + 14, ob.w * 0.5, 16, 0.3);
-      drawArt(ctx, 'guardrail', ob.x, ob.y, { flip: ob.flip, rot: ob.flip ? -0.43 : 0.43, scale: S });
+      drawArt(ctx, 'guardrail', ob.x, ob.y, { flip: ob.flip, rot: ob.flip ? -0.43 : 0.43, scale: S, hazard });
       break;
     case 'tree':
-      drawArt(ctx, ob.art, ob.x, ob.y, { rot: ob.flip ? Math.PI / 2 : -Math.PI / 2, scale: S });
-      break;
-    case 'barrel':
-    case 'tire':
-      if (ob.broken) return;
-      shadow(ctx, ob.x + 3, ob.y + 16, 18, 6);
-      drawArt(ctx, ob.art, ob.x, ob.y, { flip: ob.flip, scale: S });
+      drawArt(ctx, ob.art, ob.x, ob.y, { rot: ob.flip ? Math.PI / 2 : -Math.PI / 2, scale: S, hazard });
       break;
     default:
       break;
@@ -328,12 +383,7 @@ function drawDebug(ctx, world) {
     ctx.strokeRect(Math.round(e.x - e.w / 2), Math.round(e.y - e.h / 2), e.w, e.h);
   };
   for (const ob of world.obstacles) {
-    if (ob.kind === 'pothole') {
-      ctx.strokeStyle = '#ff0';
-      ctx.beginPath();
-      ctx.arc(ob.x, ob.y, ob.r * 0.8, 0, Math.PI * 2);
-      ctx.stroke();
-    } else box(ob, ob.solid ? '#f33' : '#fa0');
+    box(ob, ob.solid ? '#f33' : '#fa0');
   }
   for (const z of world.zombies) box(z, '#0f0');
   for (const pk of world.pickups) box(pk, '#0ff');

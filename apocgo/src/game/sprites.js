@@ -1,5 +1,5 @@
 // Procedural pixel-art sprites for things the concept art doesn't contain (pickup
-// icons, potholes, rubble, poles…). Drawn once into offscreen canvases, cached, and
+// icons, bushes, the radio tower…). Drawn once into offscreen canvases, cached, and
 // rendered at PIXEL scale so their chunky pixels match the art in assets/.
 
 import { RNG } from '../engine/rng.js';
@@ -83,44 +83,6 @@ export function pickupSprite(type) {
 }
 
 // ---------------------------------------------------------------- obstacles
-
-/** Jagged hole in the asphalt (pothole or collapse). */
-export function holeSprite(w, h, seed) {
-  return cached(`hole_${w}_${h}_${seed}`, () => make(w + 4, h + 4, (g) => {
-    const rng = new RNG(seed);
-    const cx = (w + 4) / 2;
-    const cy = (h + 4) / 2;
-    const n = 14;
-    const radii = Array.from({ length: n }, () => rng.range(0.72, 1));
-    const poly = (scale, color) => {
-      g.fillStyle = color;
-      g.beginPath();
-      for (let i = 0; i < n; i++) {
-        const a = (i / n) * Math.PI * 2;
-        const x = cx + Math.cos(a) * (w / 2) * radii[i] * scale;
-        const y = cy + Math.sin(a) * (h / 2) * radii[i] * scale;
-        if (i) g.lineTo(x, y);
-        else g.moveTo(x, y);
-      }
-      g.closePath();
-      g.fill();
-    };
-    poly(1.05, '#57504a'); // broken rim
-    poly(0.92, '#2a2420');
-    poly(0.78, '#15110f');
-    poly(0.55, '#070605');
-    // loose chunks on the rim
-    for (let i = 0; i < Math.max(2, (w * h) / 180); i++) {
-      const a = rng.range(0, Math.PI * 2);
-      g.fillStyle = rng.pick(['#4a4540', '#625a52', '#3a3530']);
-      g.fillRect(
-        Math.round(cx + Math.cos(a) * (w / 2) * 0.95),
-        Math.round(cy + Math.sin(a) * (h / 2) * 0.95),
-        rng.int(1, 2), rng.int(1, 2),
-      );
-    }
-  }));
-}
 
 // ---------------------------------------------------------------- decor
 

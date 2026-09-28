@@ -4,7 +4,7 @@
 
 import { Camera } from '../engine/camera.js';
 import { Particles } from '../engine/particles.js';
-import { aabbOverlap, aabbPenetration, circleRectOverlap, clamp } from '../engine/math.js';
+import { aabbOverlap, aabbPenetration, clamp } from '../engine/math.js';
 import { RNG } from '../engine/rng.js';
 import {
   ART, BUFFER_W, VIEW_W, VIEW_H, CHUNK_H, DRIVE_HALF, PIXEL, ROAD_HALF, PX_PER_METER, SHOTGUN, SURVIVAL,
@@ -14,6 +14,13 @@ import { generateChunk } from './generator.js';
 import { Truck } from './truck.js';
 
 const TOAST_TIME = 2.2;
+const OBSTACLE_NAMES = {
+  collapse: 'провал',
+  wreck: 'брошенная машина',
+  rail: 'отбойник',
+  tree: 'дерево',
+  barricade: 'завал',
+};
 
 export class World {
   constructor({ save, seed = (Math.random() * 1e9) | 0 }) {
@@ -326,28 +333,6 @@ export class World {
     const truck = this.truck;
     const tb = truck.box;
     for (const ob of this.obstacles) {
-      if (ob.kind === 'pothole') {
-        if (ob.hit || !circleRectOverlap(ob.x, ob.y, ob.r * 0.8, tb)) continue;
-        ob.hit = true;
-        truck.damage(2 + Math.abs(truck.speed) / 130);
-        truck.speed *= 0.75;
-        truck.slow = 0.8;
-        this.camera.shake(2.5, 0.2);
-        this.dust(ob.x, ob.y, 8);
-        continue;
-      }
-      if (ob.breakable) {
-        if (ob.broken || !aabbOverlap(ob, tb)) continue;
-        ob.broken = true;
-        truck.damage(3 * truck.stats.ram);
-        truck.speed *= 0.85;
-        this.camera.shake(1.5, 0.15);
-        this.particles.emit(ob.x, ob.y, {
-          count: 10, colors: ob.kind === 'barrel' ? ['#7a4b2a', '#5a341c', '#a4703f'] : ['#1d1b1a', '#3a3632'],
-          speed: 80, angle: -Math.PI / 2, spread: 2, life: 0.6,
-        });
-        continue;
-      }
       if (!ob.solid) continue;
       const pen = aabbPenetration(truck.box, ob);
       if (!pen) continue;
@@ -360,12 +345,13 @@ export class World {
           truck.damage(dmg);
           truck.invuln = 0.5;
           this.hitFlash = 1;
+          ob.hitAt = this.time; // the view flashes the obstacle that was hit
           this.camera.shake(Math.min(7, impact / 70), 0.3);
           this.particles.emit(truck.x, truck.y - truck.h / 2 * pen.sy, {
             count: 16, colors: ['#ffd36b', '#ff9d3a', '#6f6861'], speed: 110,
             angle: pen.sy > 0 ? -Math.PI / 2 : Math.PI / 2, spread: 2.2, life: 0.4,
           });
-          if (dmg > 10) this.toast(`Удар! −${Math.round(dmg)} брони`, '#ff6a55');
+          this.toast(`Удар: ${OBSTACLE_NAMES[ob.kind] || 'препятствие'} −${Math.max(1, Math.round(dmg))} брони`, '#ff6a55');
         }
         truck.speed = pen.sy > 0 ? -Math.max(0, truck.speed) * 0.25 : Math.max(0, truck.speed);
       } else {

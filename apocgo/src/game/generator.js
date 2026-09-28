@@ -64,25 +64,7 @@ export function generateChunk(seed, index) {
     solids.push(ob);
   }
 
-  // 2. Potholes (hazard, not solid) — only on asphalt.
-  for (let i = rng.int(...SPAWN.potholes(d)); i > 0; i--) {
-    const r = rng.range(18, 32) * S;
-    const p = place(rng, top, solids, r * 2, r * 2, ROAD_HALF - r);
-    if (p) out.obstacles.push({ kind: 'pothole', ...p, r, solid: false, hazard: true, seed: rng.int(0, 1e9) });
-  }
-
-  // 3. Small breakable debris: barrels and tyres.
-  for (let i = rng.int(...SPAWN.smallDebris(d)); i > 0; i--) {
-    const tire = rng.chance(0.35);
-    const art = rng.pick(tire ? ART.tires : ART.barrels);
-    const p = place(rng, top, solids, 44 * S, 44 * S, DRIVE_HALF - 30);
-    if (!p) continue;
-    const ob = { kind: tire ? 'tire' : 'barrel', art, ...p, solid: false, breakable: true, flip: rng.chance(0.5) };
-    out.obstacles.push(ob);
-    solids.push(ob);
-  }
-
-  // 4. Zombies.
+  // 2. Zombies.
   for (let i = rng.int(...SPAWN.zombies(d)); i > 0; i--) {
     const p = place(rng, top, solids, ZOMBIE.w, ZOMBIE.h, DRIVE_HALF - 20);
     if (!p) continue;
@@ -97,7 +79,7 @@ export function generateChunk(seed, index) {
     });
   }
 
-  // 5. Pickups — half of them lure the player onto the slower shoulders.
+  // 3. Pickups — half of them lure the player onto the slower shoulders.
   for (const [type, chance] of Object.entries(SPAWN.pickupChance)) {
     if (!rng.chance(chance)) continue;
     const onShoulder = rng.chance(0.5);
