@@ -12,6 +12,7 @@ export class Camera {
     this.ox = 0;
     this.oy = 0;
     this.shakeScale = 1; // world units per "shake pixel"
+    this.zoom = 1; // buffer pixels per world unit
   }
 
   follow(tx, ty, dt, rate = 8) {
@@ -56,10 +57,11 @@ export class Camera {
 
   /** Apply the world transform to a context (pixel-snapped to avoid shimmering). */
   apply(ctx) {
+    const z = this.zoom;
     ctx.setTransform(
-      1, 0, 0, 1,
-      Math.round(this.viewW / 2 - this.x + this.ox),
-      Math.round(this.viewH / 2 - this.y + this.oy),
+      z, 0, 0, z,
+      Math.round((this.viewW / 2 - this.x + this.ox) * z),
+      Math.round((this.viewH / 2 - this.y + this.oy) * z),
     );
   }
 

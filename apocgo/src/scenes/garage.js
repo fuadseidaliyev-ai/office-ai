@@ -1,5 +1,5 @@
 import { bar, panel, text } from '../engine/text.js';
-import { UI_W, UI_H, VIEW_W, VIEW_H, UPGRADES, UPGRADE_KEYS, computeTruckStats, goalMeters, upgradeCost } from '../game/config.js';
+import { UI_W, UI_H, BUFFER_W, BUFFER_H, UPGRADES, UPGRADE_KEYS, computeTruckStats, goalMeters, upgradeCost } from '../game/config.js';
 import { art } from '../game/art.js';
 
 // Spend scrap on truck upgrades between runs.
@@ -39,19 +39,20 @@ export class GarageScene {
 
   render(ctx) {
     ctx.fillStyle = '#1a1410';
-    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    ctx.fillRect(0, 0, BUFFER_W, BUFFER_H);
     ctx.fillStyle = '#231b15';
-    for (let y = 0; y < VIEW_H; y += 54) ctx.fillRect(0, y, VIEW_W, 3);
+    for (let y = 0; y < BUFFER_H; y += 54) ctx.fillRect(0, y, BUFFER_W, 3);
     // truck on the lift, under a work lamp
-    const cx = 1300;
-    const cy = 480;
-    const g = ctx.createRadialGradient(cx, cy, 40, cx, cy, 420);
+    const cx = BUFFER_W * 0.81;
+    const cy = BUFFER_H * 0.53;
+    const g = ctx.createRadialGradient(cx, cy, 40, cx, cy, 540);
     g.addColorStop(0, 'rgba(255,210,140,0.18)');
     g.addColorStop(1, 'rgba(255,210,140,0)');
     ctx.fillStyle = g;
-    ctx.fillRect(cx - 420, cy - 420, 840, 840);
+    ctx.fillRect(cx - 540, cy - 540, 1080, 1080);
     const img = art.truck;
-    if (img) ctx.drawImage(img, cx - img.width * 0.75, cy - img.height * 0.75, img.width * 1.5, img.height * 1.5);
+    const k = 1.5;
+    if (img) ctx.drawImage(img, cx - (img.width * k) / 2, cy - (img.height * k) / 2, img.width * k, img.height * k);
   }
 
   renderUI(ui) {

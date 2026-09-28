@@ -1,5 +1,5 @@
 import { text } from '../engine/text.js';
-import { UI_W, UI_H, VIEW_W, VIEW_H } from '../game/config.js';
+import { UI_W, UI_H, BUFFER_W, BUFFER_H } from '../game/config.js';
 import { drawWorld } from '../game/view.js';
 import { World } from '../game/world.js';
 
@@ -24,7 +24,7 @@ export class MenuScene {
   render(ctx) {
     drawWorld(ctx, this.world, { hideTruck: true });
     ctx.fillStyle = 'rgba(10,6,3,0.45)';
-    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    ctx.fillRect(0, 0, BUFFER_W, BUFFER_H);
   }
 
   renderUI(ui) {

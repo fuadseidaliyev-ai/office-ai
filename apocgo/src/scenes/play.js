@@ -1,5 +1,5 @@
 import { panel, text } from '../engine/text.js';
-import { UI_W, UI_H, VIEW_W, VIEW_H } from '../game/config.js';
+import { UI_W, UI_H, BUFFER_W, BUFFER_H } from '../game/config.js';
 import { drawHud, vitalsRows } from '../game/hud.js';
 import { drawTouchButtons, touchButtons } from '../game/touchpad.js';
 import { drawWorld } from '../game/view.js';

@@ -8,7 +8,7 @@
 import { RNG, hashSeed } from '../engine/rng.js';
 import { aabbOverlap, clamp } from '../engine/math.js';
 import {
-  ART, CHUNK_H, DECOR, DRIVE_HALF, PICKUPS, ROAD_HALF, SAFE_CHUNKS, SPAWN, ZOMBIE,
+  ART, CHUNK_H, DECOR, DRIVE_HALF, OBSTACLE_SCALE as S, PICKUPS, ROAD_HALF, SAFE_CHUNKS, SPAWN, ZOMBIE,
 } from './config.js';
 
 const BANDS = 3;
@@ -66,7 +66,7 @@ export function generateChunk(seed, index) {
 
   // 2. Potholes (hazard, not solid) — only on asphalt.
   for (let i = rng.int(...SPAWN.potholes(d)); i > 0; i--) {
-    const r = rng.range(18, 32);
+    const r = rng.range(18, 32) * S;
     const p = place(rng, top, solids, r * 2, r * 2, ROAD_HALF - r);
     if (p) out.obstacles.push({ kind: 'pothole', ...p, r, solid: false, hazard: true, seed: rng.int(0, 1e9) });
   }
@@ -75,7 +75,7 @@ export function generateChunk(seed, index) {
   for (let i = rng.int(...SPAWN.smallDebris(d)); i > 0; i--) {
     const tire = rng.chance(0.35);
     const art = rng.pick(tire ? ART.tires : ART.barrels);
-    const p = place(rng, top, solids, 44, 44, DRIVE_HALF - 30);
+    const p = place(rng, top, solids, 44 * S, 44 * S, DRIVE_HALF - 30);
     if (!p) continue;
     const ob = { kind: tire ? 'tire' : 'barrel', art, ...p, solid: false, breakable: true, flip: rng.chance(0.5) };
     out.obstacles.push(ob);
@@ -118,27 +118,28 @@ function makeBlocker(rng, kind) {
     case 'wreck': {
       // police car art is 302x175, seen from the side; vertical = rotated 90°
       const horizontal = rng.chance(0.6);
-      return { ...base, w: horizontal ? 270 : 140, h: horizontal ? 140 : 270, horizontal };
+      const [a, b] = [Math.round(270 * S), Math.round(140 * S)];
+      return { ...base, w: horizontal ? a : b, h: horizontal ? b : a, horizontal };
     }
     case 'collapse': {
-      const w = Math.round(rng.range(180, 300));
+      const w = Math.round(rng.range(180, 300) * S);
       return { ...base, w, h: Math.round(w * 0.72) };
     }
     case 'rail':
       // guardrail art (drawn at a slant in the concept) rotated to lie across the road
-      return { ...base, w: 300, h: 56 };
+      return { ...base, w: Math.round(300 * S), h: Math.round(56 * S) };
     case 'tree':
       // tree art (≈180 tall) lying across the road
-      return { ...base, art: rng.pick(['tree1', 'tree2']), w: 180, h: 70 };
+      return { ...base, art: rng.pick(['tree1', 'tree2']), w: Math.round(180 * S), h: Math.round(70 * S) };
     case 'barricade': {
-      const w = Math.round(rng.range(...BLOCKERS.barricade.w));
-      const h = Math.round(rng.range(...BLOCKERS.barricade.h));
+      const w = Math.round(rng.range(...BLOCKERS.barricade.w) * S);
+      const h = Math.round(rng.range(...BLOCKERS.barricade.h) * S);
       const pieces = [];
       for (let i = rng.int(5, 8); i > 0; i--) {
         pieces.push({
           art: rng.pick([...ART.barrels, ...ART.tires, 'crate']),
-          dx: rng.range(-w / 2 + 25, w / 2 - 25),
-          dy: rng.range(-h / 2 + 20, h / 2 - 15),
+          dx: rng.range(-w / 2 + 25 * S, w / 2 - 25 * S),
+          dy: rng.range(-h / 2 + 20 * S, h / 2 - 15 * S),
           flip: rng.chance(0.5),
         });
       }
@@ -193,7 +194,7 @@ function addDecor(rng, top, out) {
       const half = DECOR[kind].w / 2;
       out.decor.push({
         kind,
-        x: side * (DRIVE_HALF + 40 + half + rng.range(0, 60)),
+        x: side * (DRIVE_HALF + 40 + half + rng.range(0, 180)),
         y,
         side,
         // art is drawn for the left side; mirror it on the right unless it carries text

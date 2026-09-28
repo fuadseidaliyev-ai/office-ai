@@ -7,7 +7,7 @@ import { Particles } from '../engine/particles.js';
 import { aabbOverlap, aabbPenetration, circleRectOverlap, clamp } from '../engine/math.js';
 import { RNG } from '../engine/rng.js';
 import {
-  ART, VIEW_W, VIEW_H, CHUNK_H, DRIVE_HALF, PIXEL, ROAD_HALF, PX_PER_METER, SHOTGUN, SURVIVAL,
+  ART, BUFFER_W, VIEW_W, VIEW_H, CHUNK_H, DRIVE_HALF, PIXEL, ROAD_HALF, PX_PER_METER, SHOTGUN, SURVIVAL,
   ZOMBIE, PICKUPS, computeTruckStats, goalMeters,
 } from './config.js';
 import { generateChunk } from './generator.js';
@@ -25,6 +25,7 @@ export class World {
 
     this.truck = new Truck(computeTruckStats(save.upgrades));
     this.camera = new Camera(VIEW_W, VIEW_H);
+    this.camera.zoom = BUFFER_W / VIEW_W;
     this.camera.shakeScale = PIXEL;
     this.camera.snap(0, this.truck.y - VIEW_H * 0.2);
     this.particles = new Particles(900, PIXEL);

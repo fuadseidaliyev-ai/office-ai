@@ -2,7 +2,7 @@
 // Layer order (bottom → top): ground, road, markings, decals, holes, pickups,
 // obstacles, zombies, truck, gunfire, particles, roadside decor, screen overlays.
 
-import { PIXEL, ROAD_HALF, VIEW_W, VIEW_H } from './config.js';
+import { BUFFER_W, BUFFER_H, OBSTACLE_SCALE as S, PIXEL, ROAD_HALF } from './config.js';
 import { art } from './art.js';
 import {
   bushSprite, holeSprite, paintSprite, pickupSprite, radioTowerSprite, vignette,
@@ -112,10 +112,10 @@ export function drawWorld(ctx, world, { hideTruck = false, debug = false } = {})
 
   // screen-space overlays
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.drawImage(vignette(VIEW_W / 4, VIEW_H / 4), 0, 0, VIEW_W, VIEW_H);
+  ctx.drawImage(vignette(BUFFER_W / 4, BUFFER_H / 4), 0, 0, BUFFER_W, BUFFER_H);
   if (world.hitFlash > 0) {
     ctx.fillStyle = `rgba(160,20,10,${0.3 * world.hitFlash})`;
-    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    ctx.fillRect(0, 0, BUFFER_W, BUFFER_H);
   }
 }
 
@@ -216,26 +216,26 @@ function drawObstacle(ctx, ob) {
   switch (ob.kind) {
     case 'barricade':
       shadow(ctx, ob.x + 6, ob.y + 12, ob.w * 0.55, ob.h * 0.55, 0.3);
-      for (const p of ob.pieces) drawArt(ctx, p.art, ob.x + p.dx, ob.y + p.dy, { flip: p.flip });
+      for (const p of ob.pieces) drawArt(ctx, p.art, ob.x + p.dx, ob.y + p.dy, { flip: p.flip, scale: S });
       break;
     case 'wreck':
       shadow(ctx, ob.x + 8, ob.y + 14, ob.w * 0.55, ob.h * 0.5, 0.3);
       // never mirrored: the art has "POLICE" lettering
-      if (ob.horizontal) drawArt(ctx, 'police', ob.x, ob.y);
-      else drawArt(ctx, 'police', ob.x, ob.y, { rot: ob.flip ? Math.PI / 2 : -Math.PI / 2 });
+      if (ob.horizontal) drawArt(ctx, 'police', ob.x, ob.y, { scale: S });
+      else drawArt(ctx, 'police', ob.x, ob.y, { rot: ob.flip ? Math.PI / 2 : -Math.PI / 2, scale: S });
       break;
     case 'rail':
       shadow(ctx, ob.x + 6, ob.y + 14, ob.w * 0.5, 16, 0.3);
-      drawArt(ctx, 'guardrail', ob.x, ob.y, { flip: ob.flip, rot: ob.flip ? -0.43 : 0.43 });
+      drawArt(ctx, 'guardrail', ob.x, ob.y, { flip: ob.flip, rot: ob.flip ? -0.43 : 0.43, scale: S });
       break;
     case 'tree':
-      drawArt(ctx, ob.art, ob.x, ob.y, { rot: ob.flip ? Math.PI / 2 : -Math.PI / 2 });
+      drawArt(ctx, ob.art, ob.x, ob.y, { rot: ob.flip ? Math.PI / 2 : -Math.PI / 2, scale: S });
       break;
     case 'barrel':
     case 'tire':
       if (ob.broken) return;
-      shadow(ctx, ob.x + 4, ob.y + 22, 24, 8);
-      drawArt(ctx, ob.art, ob.x, ob.y, { flip: ob.flip });
+      shadow(ctx, ob.x + 3, ob.y + 16, 18, 6);
+      drawArt(ctx, ob.art, ob.x, ob.y, { flip: ob.flip, scale: S });
       break;
     default:
       break;

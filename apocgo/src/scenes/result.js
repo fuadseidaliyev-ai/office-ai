@@ -1,5 +1,5 @@
 import { panel, text } from '../engine/text.js';
-import { UI_W, UI_H, VIEW_W, VIEW_H } from '../game/config.js';
+import { UI_W, UI_H, BUFFER_W, BUFFER_H } from '../game/config.js';
 
 // Summary after a run: why it ended and what was brought back.
 export class ResultScene {
@@ -16,7 +16,7 @@ export class ResultScene {
 
   render(ctx) {
     ctx.fillStyle = this.r.won ? '#1a1a10' : '#1a0e0b';
-    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    ctx.fillRect(0, 0, BUFFER_W, BUFFER_H);
   }
 
   renderUI(ui) {

@@ -2,17 +2,25 @@
 
 // World buffer. World units == pixels of the concept art (tools/reference.png), so the
 // art in assets/ is drawn at native size.
-export const VIEW_W = 1600;
-export const VIEW_H = 900;
+// The camera shows 1.3x the concept-art frame (zoomed out) so there is more road to read.
+export const VIEW_W = 2080; // world units visible on screen
+export const VIEW_H = 1170;
+// The world is rendered into a buffer of this size (camera zoom = BUFFER_W / VIEW_W),
+// which keeps the per-frame pixel cost independent of how far out the camera is.
+export const BUFFER_W = 1600;
+export const BUFFER_H = 900;
 // UI layer works in its own small virtual resolution (crisp text, simple layout maths).
 export const UI_W = 480;
 export const UI_H = 270;
 // Procedural pixel sprites (pickups, rubble…) are drawn at this scale to match the art.
 export const PIXEL = 3;
+// Obstacles are drawn (and collide) smaller than in the concept art, so the truck has
+// room to weave between them.
+export const OBSTACLE_SCALE = 0.72;
 
 // World layout. The truck drives "north" (−y).
-export const ROAD_HALF = 400; // asphalt from −400 to +400
-export const DRIVE_HALF = 540; // truck can go onto the shoulders up to here
+export const ROAD_HALF = 520; // asphalt from −520 to +520
+export const DRIVE_HALF = 680; // truck can go onto the shoulders up to here
 export const CHUNK_H = 900; // world is generated in horizontal strips of this height
 export const PX_PER_METER = 35;
 export const SAFE_CHUNKS = 2; // first chunks are obstacle-free
@@ -23,11 +31,11 @@ export function goalMeters(level) {
 
 // Base truck stats before upgrades.
 export const TRUCK_BASE = {
-  maxSpeed: 520, // px/s
-  accel: 300,
-  brake: 650,
-  drag: 120,
-  handling: 380, // lateral px/s at full steer
+  maxSpeed: 600, // px/s
+  accel: 340,
+  brake: 700,
+  drag: 130,
+  handling: 460, // lateral px/s at full steer
   offroad: 0.55, // max-speed multiplier on the shoulders
   maxHp: 100,
   maxFuel: 100,

@@ -7,7 +7,7 @@ import { Input } from './engine/input.js';
 import { Renderer } from './engine/renderer.js';
 import { SceneManager } from './engine/scene.js';
 import { ART_FILES, setArt } from './game/art.js';
-import { VIEW_W, VIEW_H, UI_W, UI_H } from './game/config.js';
+import { BUFFER_W, BUFFER_H, UI_W, UI_H } from './game/config.js';
 import { loadSave, writeSave } from './game/save.js';
 import { isTouchDevice } from './game/touchpad.js';
 import { MenuScene } from './scenes/menu.js';
@@ -29,7 +29,7 @@ const game = {
   debug: false,
   touchUI: isTouchDevice(), // on-screen gas / brake / steering buttons
   save: loadSave(),
-  renderer: new Renderer(canvas, VIEW_W, VIEW_H, UI_W, UI_H),
+  renderer: new Renderer(canvas, BUFFER_W, BUFFER_H, UI_W, UI_H),
   input: new Input(window, { width: UI_W, height: UI_H }),
   persist() {
     writeSave(this.save);
