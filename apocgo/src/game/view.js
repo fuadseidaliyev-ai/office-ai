@@ -164,7 +164,7 @@ function drawSkids(ctx, world) {
 }
 
 // Wheel positions in the truckGun art (centre-relative): [x, y, isFront].
-const TRUCK_WHEELS = [[-80, -90, true], [80, -90, true], [-80, 78, false], [80, 78, false]];
+const TRUCK_WHEELS = [[-80, -90, true], [80, -90, true], [-93, 70, false], [93, 70, false]];
 const FRONT_STEER = 0.6; // rad the front wheels turn at full lock (~35°)
 const TRUCK_ROLL = 6; // px the body shifts to the outside of a turn
 
