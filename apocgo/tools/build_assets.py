@@ -249,8 +249,91 @@ def pickups():
         print(f'{name:14s} {res.size}')
 
 
+# ---------------------------------------------------------------- dog gunner
+# tools/dog/gunner.png: the truck with the dog standing at a mounted machine gun.
+# Produces the truck without the dog (the bed is retouched) and a separate
+# "turret" sprite (dog + gun) that the game rotates toward its target.
+
+GUNNER_TRUCK_BOX = (735, 505, 935, 833)  # truck in the reference
+GUNNER_DOG_BOX = (795, 560, 880, 775)    # dog crop for background removal
+GUN_BARREL = (831, 575, 840, 600)        # barrel (x0, y0, x1, y1), reference coords (below the flash)
+GUN_BODY = (827, 598, 844, 642)          # receiver under the dog's paws
+TURRET_PIVOT = (836, 680)                # the dog turns around its shoulders
+
+
+def gunner():
+    import cv2
+    from rembg import new_session, remove
+    ref = Image.open(Path(__file__).parent / 'dog' / 'gunner.png').convert('RGB')
+    arr = np.array(ref)
+
+    # dog cutout (birefnet keeps the dog, drops the busy truck behind it)
+    s = new_session('birefnet-general-lite')
+    dog = np.array(remove(ref.crop(GUNNER_DOG_BOX), session=s))
+    del s
+    dog_alpha = np.zeros(arr.shape[:2], bool)
+    x0, y0 = GUNNER_DOG_BOX[:2]
+    dog_alpha[y0:y0 + dog.shape[0], x0:x0 + dog.shape[1]] = dog[..., 3] >= 140
+
+    gun_alpha = np.zeros(arr.shape[:2], bool)
+    for bx0, by0, bx1, by1 in (GUN_BARREL, GUN_BODY):
+        gun_alpha[by0:by1, bx0:bx1] = True
+
+    # turret sprite: gun under the dog, in a canvas centred on the pivot
+    tx0, ty0, tx1, ty1 = 790, 556, 884, 780
+    px, py = TURRET_PIVOT
+    half_w = max(px - tx0, tx1 - px)
+    half_h = max(py - ty0, ty1 - py)
+    tur = np.zeros((half_h * 2, half_w * 2, 4), np.uint8)
+    for mask in (gun_alpha, dog_alpha):
+        ys, xs = np.nonzero(mask[ty0:ty1, tx0:tx1])
+        ys, xs = ys + ty0, xs + tx0
+        tur[ys - py + half_h, xs - px + half_w, :3] = arr[ys, xs]
+        tur[ys - py + half_h, xs - px + half_w, 3] = 255
+    Image.fromarray(tur, 'RGBA').save(OUT / 'dogGunner.png')
+
+    # truck without dog / gun / muzzle flash: remove background, then retouch the bed
+    s = new_session('u2net')
+    truck = np.array(remove(ref.crop(GUNNER_TRUCK_BOX), session=s))
+    del s
+    bx, by = GUNNER_TRUCK_BOX[:2]
+    hole = (dog_alpha | gun_alpha)[by:by + truck.shape[0], bx:bx + truck.shape[1]]
+    region = arr[by:by + truck.shape[0], bx:bx + truck.shape[1]].astype(np.float32)
+    # muzzle flash over the cab roof (reference y 510..580, around the barrel)
+    flash = np.zeros_like(hole)
+    fy0, fy1 = 510 - by, 582 - by
+    fx0, fx1 = 812 - bx, 862 - bx
+    flash[fy0:fy1, fx0:fx1] = (lum(region[fy0:fy1, fx0:fx1]) > 120) | (region[fy0:fy1, fx0:fx1, 0] - region[fy0:fy1, fx0:fx1, 2] > 60)
+    flash = cv2.dilate(flash.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+    hole = cv2.dilate(hole.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+    rgb = truck[..., :3].copy()
+    # the bed: fill with the same row of the bed a bit to the left (real texture, no smear)
+    shift = 40
+    ys, xs = np.nonzero(hole | flash)
+    ok = (xs - shift >= 0) & ~(hole | flash)[ys, np.clip(xs - shift, 0, None)]
+    rgb[ys[ok], xs[ok]] = rgb[ys[ok], xs[ok] - shift]
+    rest = (hole | flash).copy()
+    rest[ys[ok], xs[ok]] = False
+    rgb = cv2.inpaint(rgb, rest.astype(np.uint8), 5, cv2.INPAINT_TELEA)
+    truck[..., :3] = rgb
+    hole = hole | flash
+    truck[..., 3] = np.where(truck[..., 3] >= 140, 255, 0)
+    truck[hole, 3] = 255  # retouched bed stays opaque
+    img = Image.fromarray(truck, 'RGBA')
+    img = img.crop(img.getbbox())
+    img.save(OUT / 'truckGun.png')
+    # where the turret pivot sits relative to the truck sprite's centre
+    bb = Image.fromarray(truck, 'RGBA').getbbox()
+    cx = bx + bb[0] + img.width / 2
+    cy = by + bb[1] + img.height / 2
+    print(f'truckGun {img.size}  dogGunner {tur.shape[1]}x{tur.shape[0]}  pivot offset {px - cx:.1f},{py - cy:.1f}')
+
+
 if __name__ == '__main__':
     import sys
+    if '--gunner' in sys.argv:
+        gunner()
+        sys.exit()
     if '--pickups' in sys.argv:
         pickups()
         sys.exit()

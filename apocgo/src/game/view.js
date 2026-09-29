@@ -2,7 +2,7 @@
 // Layer order (bottom → top): ground, road, markings, decals, holes, pickups,
 // obstacles, zombies, truck, gunfire, particles, roadside decor, screen overlays.
 
-import { BUFFER_W, BUFFER_H, OBSTACLE_ART_SCALE, PICKUPS, PIXEL, ROAD_HALF } from './config.js';
+import { BUFFER_W, BUFFER_H, DOG_GUN, OBSTACLE_ART_SCALE, PICKUPS, PIXEL, ROAD_HALF } from './config.js';
 import { art } from './art.js';
 import {
   bushSprite, paintSprite, pickupSprite, radioTowerSprite, vignette,
@@ -288,7 +288,7 @@ function drawZombie(ctx, z) {
 
 function drawTruck(ctx, world) {
   const t = world.truck;
-  const img = art.truck;
+  const img = art.truckGun || art.truck;
   ctx.save();
   ctx.translate(Math.round(t.x), Math.round(t.y));
   ctx.rotate(t.tilt);
@@ -313,11 +313,22 @@ function drawTruck(ctx, world) {
   if (t.braking && img) {
     ctx.fillStyle = 'rgba(255,50,30,0.35)';
     ctx.beginPath();
-    ctx.arc(-78, img.height / 2 - 70, 26, 0, Math.PI * 2);
-    ctx.arc(78, img.height / 2 - 70, 26, 0, Math.PI * 2);
+    ctx.arc(-68, img.height / 2 - 46, 24, 0, Math.PI * 2);
+    ctx.arc(68, img.height / 2 - 46, 24, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
+
+  // the dog at the machine gun, turning toward whatever it shoots at
+  const dog = art.dogGunner;
+  if (dog && art.truckGun && !blink) {
+    const p = world.dogPivot;
+    ctx.save();
+    ctx.translate(Math.round(p.x), Math.round(p.y));
+    ctx.rotate(world.dogAim);
+    ctx.drawImage(dog, -dog.width / 2, -dog.height / 2);
+    ctx.restore();
+  }
 }
 
 function drawGunfire(ctx, world) {

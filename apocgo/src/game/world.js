@@ -48,6 +48,7 @@ export class World {
 
     // the dog's shotgun (unlimited shells, fires on its own while the dog is fed)
     this.gunCooldown = 0;
+    this.dogAim = 0; // turret angle, world space: 0 = straight up the road, clockwise
     this.dogKills = 0;
     this.shots = []; // tracers {x1, y1, x2, y2, t}
     this.muzzle = 0;
@@ -269,9 +270,16 @@ export class World {
 
   updateDog(dt) {
     this.gunCooldown = Math.max(0, this.gunCooldown - dt);
-    if (!this.dogCanShoot || this.gunCooldown > 0) return;
-    const z = this.target();
-    if (z) this.dogShoot(z);
+    const z = this.dogCanShoot ? this.target() : null;
+    // swing the gun toward the target (or back to the front when idle)
+    const p = this.dogPivot;
+    const want = z ? Math.atan2(z.x - p.x, -(z.y - p.y)) : this.truck.tilt;
+    const diff = wrapAngle(want - this.dogAim);
+    const step = DOG_GUN.turnSpeed * dt;
+    this.dogAim = wrapAngle(this.dogAim + clamp(diff, -step, step));
+    if (z && this.gunCooldown <= 0 && Math.abs(wrapAngle(want - this.dogAim)) < DOG_GUN.aimTolerance) {
+      this.dogShoot(z);
+    }
   }
 
   /** Nearest living zombie within the dog's range. */
@@ -290,10 +298,19 @@ export class World {
     return best;
   }
 
-  /** Where the dog sits: the truck bed, behind the cab. */
-  get dogPos() {
+  /** The turret pivot (the dog's shoulders) in world space; it rides with the truck. */
+  get dogPivot() {
     const t = this.truck;
-    return { x: t.x, y: t.y + t.h * 0.15 };
+    const { x, y } = DOG_GUN.pivot;
+    const c = Math.cos(t.tilt);
+    const s = Math.sin(t.tilt);
+    return { x: t.x + x * c - y * s, y: t.y + x * s + y * c };
+  }
+
+  /** The muzzle: end of the barrel, wherever the dog is pointing it. */
+  get dogPos() {
+    const p = this.dogPivot;
+    return { x: p.x + Math.sin(this.dogAim) * DOG_GUN.barrel, y: p.y - Math.cos(this.dogAim) * DOG_GUN.barrel };
   }
 
   dogShoot(z) {
@@ -441,4 +458,9 @@ export class World {
 
 function isFuelLow(truck) {
   return truck.fuel < truck.stats.maxFuel * 0.2;
+}
+
+/** Normalise an angle to (−π, π]. */
+function wrapAngle(a) {
+  return Math.atan2(Math.sin(a), Math.cos(a));
 }

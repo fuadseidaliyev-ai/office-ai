@@ -138,7 +138,11 @@ export const PICKUPS = {
 // while it is fed.
 export const DOG_GUN = {
   range: 640, // px from the truck
-  cooldown: 0.6,
+  cooldown: 0.45,
+  turnSpeed: 7, // rad/s the dog swings the gun around
+  aimTolerance: 0.18, // rad: fires once the barrel points this close to the target
+  pivot: { x: 0.5, y: 10 }, // turret pivot relative to the truck centre (truckGun art)
+  barrel: 105, // pivot → muzzle distance
 };
 
 // Per-chunk spawn tuning. `d` is difficulty 0..1 growing with distance.

@@ -247,3 +247,19 @@ test('armour is lost only in obstacle collisions — zombies never cost armour',
   for (let i = 0; i < 120; i++) w.update(1 / 60, fakeInput());
   assert.equal(t.hp, t.stats.maxHp);
 });
+
+test('the dog turns the machine gun toward its target before firing', () => {
+  const w = new World({ save: defaultSave(), seed: 12 });
+  w.obstacles = [];
+  const p = w.dogPivot;
+  // a zombie behind-right of the truck: the gun must swing ~135° first
+  w.zombies = [{ x: p.x + 300, y: p.y + 300, w: 44, h: 80, speed: 0, chaseSpeed: 0, dir: 0, t: 0, dead: false }];
+  w.update(1 / 60, fakeInput());
+  assert.equal(w.dogKills, 0, 'no shot before the gun is aimed');
+  for (let i = 0; i < 40 && w.dogKills === 0; i++) w.update(1 / 60, fakeInput());
+  assert.equal(w.dogKills, 1);
+  assert.ok(Math.abs(w.dogAim - (3 * Math.PI) / 4) < 0.25, `aim ${w.dogAim}`);
+  // the muzzle sits at the end of the barrel in the aim direction
+  const m = w.dogPos;
+  assert.ok(m.x > w.dogPivot.x && m.y > w.dogPivot.y);
+});
