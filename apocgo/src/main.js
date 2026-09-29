@@ -28,6 +28,7 @@ const loading = document.getElementById('loading');
 const game = {
   debug: false,
   touchUI: isTouchDevice(), // on-screen gas / brake / steering buttons
+  view: 'chase', // 'chase' (behind the truck) | 'top' (top-down); V toggles
   save: loadSave(),
   renderer: new Renderer(canvas, BUFFER_W, BUFFER_H, UI_W, UI_H),
   input: new Input(window, { width: UI_W, height: UI_H }),

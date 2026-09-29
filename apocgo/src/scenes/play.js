@@ -3,6 +3,7 @@ import { UI_W, UI_H, BUFFER_W, BUFFER_H } from '../game/config.js';
 import { drawHud, vitalsRows } from '../game/hud.js';
 import { drawTouchButtons, touchButtons } from '../game/touchpad.js';
 import { drawWorld } from '../game/view.js';
+import { drawWorld3D } from '../game/view3d.js';
 import { World } from '../game/world.js';
 
 const END_DELAY = 1.6; // seconds to watch the crash / arrival before the results screen
@@ -32,6 +33,7 @@ export class PlayScene {
   update(dt) {
     const { input } = this.game;
     if (input.pressed('debug')) this.game.debug = !this.game.debug;
+    if (input.pressed('view')) this.game.view = this.game.view === 'chase' ? 'top' : 'chase';
     if (input.pressed('touchUI')) {
       this.game.touchUI = !this.game.touchUI;
       this.applyTouchUI();
@@ -66,7 +68,8 @@ export class PlayScene {
   }
 
   render(ctx) {
-    drawWorld(ctx, this.world, { debug: this.game.debug });
+    if (this.game.view === 'chase') drawWorld3D(ctx, this.world);
+    else drawWorld(ctx, this.world, { debug: this.game.debug });
   }
 
   renderUI(ui) {

@@ -16,6 +16,7 @@ export const DEFAULT_BINDINGS = {
   garage: ['KeyG'],
   debug: ['F3'],
   touchUI: ['KeyT'],
+  view: ['KeyV'],
   opt1: ['Digit1', 'Numpad1'],
   opt2: ['Digit2', 'Numpad2'],
   opt3: ['Digit3', 'Numpad3'],

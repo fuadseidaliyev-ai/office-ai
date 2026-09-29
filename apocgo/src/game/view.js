@@ -34,7 +34,7 @@ const HAZARD = {
 const HAZARD_PAD = 4; // outline thickness in art pixels
 const hazardCache = new Map();
 
-function hazardImage(name, variant) {
+export function hazardImage(name, variant) {
   const key = `${name}:${variant}`;
   if (hazardCache.has(key)) return hazardCache.get(key);
   const img = art[name];
@@ -72,7 +72,7 @@ function hazardImage(name, variant) {
 }
 
 /** Draw an art image centred at (x, y). `hazard: 'hit'` draws the red impact flash. */
-function drawArt(ctx, name, x, y, { flip = false, rot = 0, scale = 1, w = 0, hazard = null } = {}) {
+export function drawArt(ctx, name, x, y, { flip = false, rot = 0, scale = 1, w = 0, hazard = null } = {}) {
   let img = art[name];
   if (!img) return;
   const s = w ? w / img.width : scale;
@@ -92,13 +92,13 @@ function drawArt(ctx, name, x, y, { flip = false, rot = 0, scale = 1, w = 0, haz
 }
 
 /** Draw a procedural pixel sprite at PIXEL scale, centred. */
-function drawPixel(ctx, img, x, y, scale = PIXEL) {
+export function drawPixel(ctx, img, x, y, scale = PIXEL) {
   const w = img.width * scale;
   const h = img.height * scale;
   ctx.drawImage(img, Math.round(x - w / 2), Math.round(y - h / 2), w, h);
 }
 
-function shadow(ctx, x, y, rx, ry, alpha = 0.35) {
+export function shadow(ctx, x, y, rx, ry, alpha = 0.35) {
   ctx.fillStyle = `rgba(10,6,3,${alpha})`;
   ctx.beginPath();
   ctx.ellipse(Math.round(x), Math.round(y), rx, ry, 0, 0, Math.PI * 2);
@@ -113,21 +113,7 @@ export function drawWorld(ctx, world, { hideTruck = false, debug = false } = {})
   const bottom = Math.ceil(cam.bottom) + 120;
   const left = Math.floor(cam.left) - 120;
   const right = Math.ceil(cam.right) + 120;
-  const p = getPatterns(ctx);
-
-  // ground & road
-  ctx.fillStyle = p.ground;
-  ctx.fillRect(left, top, right - left, bottom - top);
-  ctx.fillStyle = p.asphalt;
-  ctx.fillRect(-ROAD_HALF, top, ROAD_HALF * 2, bottom - top);
-  drawRoadEdges(ctx, top, bottom, p);
-  drawMarkings(ctx, top, bottom);
-
-  // ground-level decals (cracks, graffiti, blood)
-  for (const d of world.decals) drawDecal(ctx, d);
-
-  // flat obstacles (road collapse) are part of the road surface
-  for (const ob of world.obstacles) if (ob.ground) drawObstacle(ctx, ob, isFlashing(world, ob) ? 'hit' : null);
+  drawGround(ctx, world, top, bottom, left, right);
 
   for (const pk of world.pickups) drawPickup(ctx, pk, world.time);
 
@@ -158,6 +144,30 @@ export function drawWorld(ctx, world, { hideTruck = false, debug = false } = {})
 }
 
 // Smooth 1-D value noise: broad wobble + fine jaggedness.
+/**
+ * Everything flat on the ground between world y `top`..`bottom`: dirt, asphalt, crumbling
+ * edges, markings, decals and flat obstacles. Used by the top-down view directly and by
+ * the chase view (rendered into its ground buffer, then projected).
+ */
+export function drawGround(ctx, world, top, bottom, left, right) {
+  const p = getPatterns(ctx);
+  ctx.fillStyle = p.ground;
+  ctx.fillRect(left, top, right - left, bottom - top);
+  ctx.fillStyle = p.asphalt;
+  ctx.fillRect(-ROAD_HALF, top, ROAD_HALF * 2, bottom - top);
+  drawRoadEdges(ctx, top, bottom, p);
+  drawMarkings(ctx, top, bottom);
+  // ground-level decals (cracks, graffiti, blood)
+  for (const d of world.decals) {
+    const y = d.y ?? 0;
+    if (y > top - 300 && y < bottom + 300) drawDecal(ctx, d);
+  }
+  // flat obstacles (road collapse) are part of the road surface
+  for (const ob of world.obstacles) {
+    if (ob.ground && ob.y > top - 400 && ob.y < bottom + 400) drawObstacle(ctx, ob, isFlashing(world, ob) ? 'hit' : null);
+  }
+}
+
 function edgeNoise(y, seed) {
   const smooth = (period) => {
     const f = y / period;
@@ -257,7 +267,7 @@ function drawPickup(ctx, pk, time) {
 }
 
 /** The obstacle the truck just hit blinks red for a moment. */
-function isFlashing(world, ob) {
+export function isFlashing(world, ob) {
   const t = world.time - (ob.hitAt ?? -99);
   return t < 0.7 && Math.floor(t * 10) % 2 === 0;
 }

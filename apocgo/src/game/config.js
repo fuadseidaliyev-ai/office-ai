@@ -9,6 +9,19 @@ export const VIEW_H = 1404;
 // which keeps the per-frame pixel cost independent of how far out the camera is.
 export const BUFFER_W = 1600;
 export const BUFFER_H = 900;
+// Chase camera (view3d.js): behind and above the truck, the road runs to the horizon.
+export const PERSP = {
+  camH: 768, // camera height above the road (world units)
+  camBack: 700, // how far behind the truck the camera sits
+  focal: 592, // projection focal length (buffer px)
+  horizon: 40, // horizon line on the 1600x900 buffer (near the top, like a chase cam)
+  near: 480, // nothing closer than this is drawn
+  far: 4600, // draw distance (haze covers the rest)
+  groundScale: 0.5, // ground tile px per world unit
+  groundHalfW: 1500, // ground tiles cover x = ±this
+  followX: 0.55, // how much the camera follows the truck sideways
+};
+
 // UI layer works in its own small virtual resolution (crisp text, simple layout maths).
 export const UI_W = 480;
 export const UI_H = 270;

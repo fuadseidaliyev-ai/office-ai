@@ -7,7 +7,7 @@ import { Particles } from '../engine/particles.js';
 import { aabbOverlap, aabbPenetration, clamp } from '../engine/math.js';
 import { RNG } from '../engine/rng.js';
 import {
-  ART, BUFFER_W, VIEW_W, VIEW_H, CHUNK_H, DRIVE_HALF, PIXEL, ROAD_HALF, PX_PER_METER, DOG_GUN, SURVIVAL,
+  ART, BUFFER_W, PERSP, VIEW_W, VIEW_H, CHUNK_H, DRIVE_HALF, PIXEL, ROAD_HALF, PX_PER_METER, DOG_GUN, SURVIVAL,
   ZOMBIE, PICKUPS, OBSTACLES, computeTruckStats, goalMeters,
 } from './config.js';
 import { maskHit } from './collide.js';
@@ -87,7 +87,9 @@ export class World {
   // ------------------------------------------------------------ chunks
 
   ensureChunks() {
-    while (-this.nextChunk * CHUNK_H > this.camera.top - CHUNK_H) {
+    // generate up to the top of the top-down view or the chase camera's horizon
+    const ahead = Math.min(this.camera.top, this.camera.y + VIEW_H * 0.22 - PERSP.far);
+    while (-this.nextChunk * CHUNK_H > ahead - CHUNK_H) {
       const c = generateChunk(this.seed, this.nextChunk++);
       // nothing spawns past the finish line
       const beforeGoal = (e) => e.y > this.goalY + 150;
