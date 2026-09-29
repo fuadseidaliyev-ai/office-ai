@@ -29,8 +29,8 @@ export class ResultScene {
     const rows = [
       ['Пройдено', `${r.distance} / ${r.goal} м`],
       ['Зомби сбито', r.kills],
-      ['Найдено запчастей', r.gained.scrap],
-      [r.won ? 'Привезено запчастей' : 'Спасено (½)', r.keptScrap],
+      ['Найдено деталей', r.gained.scrap],
+      [r.won ? 'Деталей в запас' : 'Деталей в запас (½)', r.keptScrap],
       ['Еда / корм найдено', `${r.gained.food} / ${r.gained.dogFood}`],
       ['Топливо подобрано', r.gained.fuel],
     ];

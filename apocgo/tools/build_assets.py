@@ -226,8 +226,34 @@ def obstacles():
     )
 
 
+# ---------------------------------------------------------------- pickups
+# The three core resources as they lie on the road (tools/pickups/*.png).
+
+PICKUP_ART = {
+    'pickScrap': ('parts.png', (470, 480, 790, 750)),
+    'pickFood': ('food.png', (470, 480, 700, 740)),
+    'pickDogFood': ('dogfood.png', (530, 470, 730, 720)),
+}
+
+
+def pickups():
+    from rembg import new_session, remove
+    session = new_session('birefnet-general-lite')
+    for name, (src, box) in PICKUP_ART.items():
+        img = Image.open(Path(__file__).parent / 'pickups' / src).convert('RGB').crop(box)
+        out = np.array(remove(img, session=session))
+        out[..., 3] = np.where(out[..., 3] >= 140, 255, 0)
+        res = Image.fromarray(out, 'RGBA')
+        res = res.crop(res.getbbox())
+        res.save(OUT / f'{name}.png')
+        print(f'{name:14s} {res.size}')
+
+
 if __name__ == '__main__':
     import sys
+    if '--pickups' in sys.argv:
+        pickups()
+        sys.exit()
     if '--obstacles' in sys.argv:
         obstacles()
         sys.exit()

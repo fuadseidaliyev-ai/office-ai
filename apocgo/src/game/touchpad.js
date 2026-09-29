@@ -1,5 +1,5 @@
 // On-screen driving controls: ◀ ▶ steering on the left, GAS / BRAKE pedals on the
-// right, plus FIRE and pause. Rects are in UI coordinates (UI_W x UI_H); Input turns
+// right, plus pause (the dog does the shooting). Rects are in UI coordinates (UI_W x UI_H); Input turns
 // fingers on them into the same actions the keyboard produces.
 
 import { text } from '../engine/text.js';
@@ -11,7 +11,6 @@ export function touchButtons() {
     { action: 'right', label: '', icon: 'right', x: 66, y: UI_H - 60, w: 54, h: 54 },
     { action: 'gas', label: 'ГАЗ', icon: 'gas', x: UI_W - 62, y: UI_H - 92, w: 56, h: 86 },
     { action: 'brake', label: 'ТОРМОЗ', icon: 'brake', x: UI_W - 122, y: UI_H - 60, w: 54, h: 54 },
-    { action: 'shoot', label: 'ОГОНЬ', icon: 'shoot', x: UI_W - 122, y: UI_H - 122, w: 54, h: 54 },
     { action: 'pause', label: '', icon: 'pause', x: UI_W / 2 - 14, y: 4, w: 28, h: 18 },
   ];
 }

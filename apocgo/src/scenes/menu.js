@@ -36,7 +36,7 @@ export class MenuScene {
     text(ui, '[Enter] В путь', UI_W / 2, 132, { size: 16, align: 'center', color: pulse ? '#ffffff' : '#d8c9a3' });
     text(ui, '[G] Гараж — улучшения', UI_W / 2, 152, { size: 12, align: 'center' });
 
-    text(ui, 'WASD / стрелки — руль, газ, тормоз    Пробел / F — выстрел    R — перезарядка', UI_W / 2, 190, { size: 9, align: 'center', color: '#b8ab8c' });
+    text(ui, 'WASD / стрелки — руль, газ, тормоз    Собака стреляет сама, пока сыта', UI_W / 2, 190, { size: 9, align: 'center', color: '#b8ab8c' });
     text(ui, 'E — поесть    Q — покормить собаку    P / Esc — пауза    T — экранные кнопки', UI_W / 2, 203, { size: 9, align: 'center', color: '#8a7d62' });
 
     text(ui, `Этап ${s.level + 1}   ·   Рекорд: ${s.bestDistance} м   ·   Запчасти: ${s.inventory.scrap}`, UI_W / 2, UI_H - 18, { size: 10, align: 'center', color: '#8a7d62' });

@@ -2,7 +2,7 @@
 // Layer order (bottom → top): ground, road, markings, decals, holes, pickups,
 // obstacles, zombies, truck, gunfire, particles, roadside decor, screen overlays.
 
-import { BUFFER_W, BUFFER_H, OBSTACLE_ART_SCALE, PIXEL, ROAD_HALF } from './config.js';
+import { BUFFER_W, BUFFER_H, OBSTACLE_ART_SCALE, PICKUPS, PIXEL, ROAD_HALF } from './config.js';
 import { art } from './art.js';
 import {
   bushSprite, paintSprite, pickupSprite, radioTowerSprite, vignette,
@@ -239,15 +239,21 @@ function drawDecal(ctx, d) {
 
 function drawPickup(ctx, pk, time) {
   const pulse = 0.5 + 0.5 * Math.sin((time + pk.t) * 4);
-  const g = ctx.createRadialGradient(pk.x, pk.y, 4, pk.x, pk.y, 46);
-  g.addColorStop(0, `rgba(255,214,120,${0.25 + pulse * 0.25})`);
+  const def = PICKUPS[pk.type];
+  const r = def.size ? def.size * 0.85 : 46;
+  const g = ctx.createRadialGradient(pk.x, pk.y, 4, pk.x, pk.y, r);
+  g.addColorStop(0, `rgba(255,214,120,${0.22 + pulse * 0.22})`);
   g.addColorStop(1, 'rgba(255,214,120,0)');
   ctx.fillStyle = g;
-  ctx.fillRect(pk.x - 46, pk.y - 46, 92, 92);
-  shadow(ctx, pk.x + 3, pk.y + 16, 18, 6);
+  ctx.fillRect(pk.x - r, pk.y - r, r * 2, r * 2);
   const bob = Math.round(pulse * 3);
-  if (pk.type === 'scrap' && art.crate) drawArt(ctx, 'crate', pk.x, pk.y - bob, { scale: 0.7 });
-  else drawPixel(ctx, pickupSprite(pk.type), pk.x, pk.y - bob, PIXEL + 1);
+  if (def.art && art[def.art]) {
+    shadow(ctx, pk.x + 4, pk.y + def.size * 0.35, def.size * 0.42, def.size * 0.12);
+    drawArt(ctx, def.art, pk.x, pk.y - bob, { w: def.size });
+  } else {
+    shadow(ctx, pk.x + 3, pk.y + 16, 18, 6);
+    drawPixel(ctx, pickupSprite(pk.type), pk.x, pk.y - bob, PIXEL + 1);
+  }
 }
 
 /** The obstacle the truck just hit blinks red for a moment. */
@@ -324,12 +330,12 @@ function drawGunfire(ctx, world) {
     ctx.stroke();
   }
   if (world.muzzle > 0) {
-    const t = world.truck;
-    const g = ctx.createRadialGradient(t.x, t.y - 30, 2, t.x, t.y - 30, 70);
+    const { x, y } = world.dogPos; // the dog fires from the truck bed
+    const g = ctx.createRadialGradient(x, y, 2, x, y, 70);
     g.addColorStop(0, 'rgba(255,240,180,0.9)');
     g.addColorStop(1, 'rgba(255,160,60,0)');
     ctx.fillStyle = g;
-    ctx.fillRect(t.x - 70, t.y - 100, 140, 140);
+    ctx.fillRect(x - 70, y - 70, 140, 140);
   }
 }
 

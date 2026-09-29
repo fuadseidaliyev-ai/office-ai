@@ -85,16 +85,19 @@ test('obstacle collisions follow the drawn shape, not the bounding box', async (
   assert.ok(maskHit(trunk, tree));
 });
 
-test('repair kits restore armour up to the maximum', () => {
-  const save = defaultSave();
-  const w = new World({ save, seed: 4 });
-  w.truck.hp = 50;
-  w.pickups = [{ type: 'repair', amount: 30, x: w.truck.x, y: w.truck.y, w: 30, h: 30, t: 0, taken: false }];
+test('car parts repair the truck; the leftover goes to the garage stock', () => {
+  const w = new World({ save: defaultSave(), seed: 4 });
+  const part = (amount) => ({ type: 'scrap', amount, x: w.truck.x, y: w.truck.y, w: 30, h: 30, t: 0, taken: false });
+  const scrap0 = w.inv.scrap;
+  w.truck.hp = 70; // needs 30 armour = 4 parts at 8 each
+  w.pickups = [part(3)];
   w.update(1 / 60, fakeInput());
-  assert.equal(w.truck.hp, 80);
-  w.pickups = [{ type: 'repair', amount: 30, x: w.truck.x, y: w.truck.y, w: 30, h: 30, t: 0, taken: false }];
+  assert.equal(w.truck.hp, 94);
+  assert.equal(w.inv.scrap, scrap0);
+  w.pickups = [part(5)]; // one part fills the last 6, four go to the stock
   w.update(1 / 60, fakeInput());
   assert.equal(w.truck.hp, w.truck.stats.maxHp);
+  assert.equal(w.inv.scrap, scrap0 + 4);
 });
 
 test('steering ramps in smoothly instead of snapping', () => {
@@ -151,7 +154,7 @@ test('headless run: truck drives forward, hunger ticks, eating works', () => {
   assert.ok(w.satiety > 40);
 });
 
-test('a run ends in a win at the goal and in a loss when the dog starves', () => {
+test('a run ends in a win at the goal and in a loss when the truck is wrecked', () => {
   const save = defaultSave();
   const w = new World({ save, seed: 5 });
   w.truck.y = w.goalY - 1;
@@ -162,11 +165,33 @@ test('a run ends in a win at the goal and in a loss when the dog starves', () =>
   assert.equal(save.level, 1);
 
   const w2 = new World({ save, seed: 6 });
-  w2.inv.dogFood = 0;
-  w2.dogSatiety = 0;
-  for (let i = 0; i < 60 * 16; i++) w2.update(1 / 60, fakeInput());
+  w2.truck.hp = 0;
+  w2.update(1 / 60, fakeInput());
   assert.equal(w2.state, 'lost');
-  assert.match(w2.reason, /Собака/);
+  assert.match(w2.reason, /Машина/);
+});
+
+test('hunger never ends the run: a starving driver is slow, a hungry dog stops shooting', () => {
+  const w = new World({ save: defaultSave(), seed: 6 });
+  w.obstacles = [];
+  w.inv.food = 0;
+  w.inv.dogFood = 0;
+  w.satiety = 0;
+  w.dogSatiety = 0;
+  for (let i = 0; i < 60 * 30; i++) w.update(1 / 60, fakeInput(['gas']));
+  assert.equal(w.state, 'running');
+  assert.ok(w.truck.speed <= w.truck.stats.maxSpeed * 0.6 + 1, `speed ${w.truck.speed}`);
+  // a zombie right next to the truck is ignored by the hungry dog…
+  assert.equal(w.dogKills, 0);
+  w.truck.speed = 0;
+  w.zombies = [{ x: w.truck.x + 200, y: w.truck.y - 300, w: 44, h: 80, speed: 0, chaseSpeed: 0, dir: 0, t: 0, dead: false }];
+  w.update(1 / 60, fakeInput());
+  assert.equal(w.dogKills, 0);
+  // …until it finds food: it eats it and starts shooting again
+  w.pickups = [{ type: 'dogFood', amount: 1, x: w.truck.x, y: w.truck.y, w: 30, h: 30, t: 0, taken: false }];
+  for (let i = 0; i < 5; i++) w.update(1 / 60, fakeInput());
+  assert.ok(w.dogSatiety > 0);
+  assert.equal(w.dogKills, 1);
 });
 
 test('losing keeps only half of the scrap found', () => {
@@ -191,20 +216,18 @@ test('long autopilot simulation never throws and keeps entity counts bounded', (
   assert.ok(Number.isFinite(w.truck.x) && Number.isFinite(w.truck.y));
 });
 
-test('shotgun kills the nearest zombie, spends shells and reloads from inventory', () => {
-  const save = defaultSave();
-  const w = new World({ save, seed: 3 });
-  w.zombies = [{ x: 0, y: -300, w: 44, h: 80, speed: 0, chaseSpeed: 0, dir: 0, t: 0, dead: false }];
-  w.update(1 / 60, fakeInput([], ['shoot']));
-  assert.equal(w.kills, 1);
-  assert.equal(w.clip, 7);
-
-  w.clip = 0;
-  const reserve = w.inv.ammo;
-  w.update(1 / 60, fakeInput([], ['shoot'])); // empty clip -> starts reloading
-  for (let i = 0; i < 120; i++) w.update(1 / 60, fakeInput());
-  assert.equal(w.clip, 8);
-  assert.equal(w.inv.ammo, reserve - 8);
+test('the dog shoots zombies by itself with unlimited shells', () => {
+  const w = new World({ save: defaultSave(), seed: 3 });
+  const z = (x, y) => ({ x, y, w: 44, h: 80, speed: 0, chaseSpeed: 0, dir: 0, t: 0, dead: false });
+  for (let n = 1; n <= 20; n++) {
+    w.zombies = [z(w.truck.x + 150, w.truck.y - 400)];
+    for (let i = 0; i < 60; i++) w.update(1 / 60, fakeInput());
+    assert.equal(w.kills, n);
+  }
+  // out of range: no shot
+  w.zombies = [z(w.truck.x, w.truck.y - 2000)];
+  for (let i = 0; i < 60; i++) w.update(1 / 60, fakeInput());
+  assert.equal(w.kills, 20);
 });
 
 test('armour is lost only in obstacle collisions — zombies never cost armour', () => {

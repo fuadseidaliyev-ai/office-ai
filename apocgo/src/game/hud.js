@@ -3,7 +3,7 @@
 
 import { text } from '../engine/text.js';
 import { art } from './art.js';
-import { PX_PER_METER, SHOTGUN, SURVIVAL, UI_W, UI_H } from './config.js';
+import { PX_PER_METER, UI_W, UI_H } from './config.js';
 
 const PANEL = 'rgba(14,12,10,0.72)';
 const BORDER = 'rgba(210,200,180,0.16)';
@@ -46,8 +46,8 @@ export function drawHud(ui, world, { fps = 0, debug = false, touch = false } = {
 
   // critical warnings (centre)
   const warn = [];
-  if (world.starve > 0) warn.push(`ВОДИТЕЛЬ ГОЛОДАЕТ · ${Math.ceil(SURVIVAL.starveLimit - world.starve)}`);
-  if (world.dogStarve > 0) warn.push(`СОБАКА ГОЛОДАЕТ · ${Math.ceil(SURVIVAL.starveLimit - world.dogStarve)}`);
+  if (world.satiety <= 0) warn.push('ВОДИТЕЛЬ ГОЛОДЕН · СКОРОСТЬ СНИЖЕНА');
+  if (world.dogSatiety <= 0) warn.push('СОБАКА ГОЛОДНА · НЕ СТРЕЛЯЕТ');
   if (world.stall > 0) warn.push('НЕТ ТОПЛИВА');
   if (warn.length && blink) {
     warn.forEach((w, i) => text(ui, w, UI_W / 2, UI_H / 2 - 40 + i * 13, { size: 12, align: 'center', color: '#ff5a45', bold: true }));
@@ -85,7 +85,7 @@ function drawObjectives(ui, world) {
   const rows = [
     ['Доехать до радиовышки', world.state === 'won'],
     [`Найти топливо (${fuelFound}/2)`, fuelFound >= 2],
-    ['Сохранить собаку', world.state === 'won', world.dogStarve > 0],
+    ['Не разбить машину', world.state === 'won', world.truck.hp < world.truck.stats.maxHp * 0.35],
   ];
   panel(ui, 4, 4, 92, 38);
   text(ui, 'ЦЕЛИ:', 8, 6, { size: 6.5, color: INK, bold: true, shadow: false });
@@ -182,7 +182,7 @@ function drawVitals(ui, world, blink, y) {
       text(ui, key, x + 88, ry, { size: 5, align: 'right', color: '#8a8474', shadow: false });
     }
   });
-  text(ui, `Запчасти: ${world.inv.scrap}`, x + 2, y - 9, { size: 6.5, color: '#c9ced3', bold: true });
+  text(ui, `Детали в запасе: ${world.inv.scrap}`, x + 2, y - 9, { size: 6.5, color: '#c9ced3', bold: true });
 }
 
 function iconCross(ui, x, y, c) {
@@ -234,26 +234,20 @@ function iconPaw(ui, x, y, c) {
 
 // ------------------------------------------------------------ shotgun (bottom-right)
 
+/** The dog's shotgun: unlimited shells, but only while the dog is fed. */
 function drawWeapon(ui, world, y) {
   const w = 64;
   const h = 26;
   const x = UI_W - w - 4;
+  const fed = world.dogCanShoot;
   panel(ui, x, y, w, h);
   if (art.shotgun) {
     const s = (w - 8) / art.shotgun.width;
+    ui.globalAlpha = fed ? 1 : 0.35;
     ui.drawImage(art.shotgun, x + 4, y + 3, art.shotgun.width * s, art.shotgun.height * s);
+    ui.globalAlpha = 1;
   }
-  // shells left in the clip
-  for (let i = 0; i < SHOTGUN.clip; i++) {
-    const sx = x + 5 + i * 3.2;
-    const full = i < world.clip;
-    ui.fillStyle = full ? '#d8d2c2' : 'rgba(216,210,194,0.18)';
-    ui.fillRect(sx, y + 14, 2, 5);
-    ui.fillStyle = full ? '#c9a24a' : 'rgba(201,162,74,0.18)';
-    ui.fillRect(sx, y + 18, 2, 2);
-  }
-  const reloading = world.reloadT > 0;
-  text(ui, reloading ? '…' : `${world.clip} / ${world.inv.ammo}`, x + w - 4, y + 13, {
-    size: 8, align: 'right', color: world.clip === 0 && !reloading ? '#ff8a75' : INK, bold: true, shadow: false,
-  });
+  iconPaw(ui, x + 8, y + 18, fed ? '#d9822b' : '#7a5a4a');
+  text(ui, fed ? 'стреляет' : 'голодна', x + 14, y + 14.5, { size: 6, color: fed ? '#cbbf9f' : '#ff8a75', shadow: false, bold: !fed });
+  text(ui, '∞', x + w - 4, y + 11, { size: 11, align: 'right', color: fed ? INK : '#7a5a4a', bold: true, shadow: false });
 }

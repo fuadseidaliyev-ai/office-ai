@@ -113,30 +113,32 @@ export function upgradeCost(key, level) {
 // Survival.
 export const SURVIVAL = {
   hungerRate: 1.5, // satiety points lost per second (driver)
-  dogHungerRate: 1.3, // (dog)
-  mealValue: 40,
-  starveLimit: 15, // seconds at 0 satiety before death
+  dogHungerRate: 1.6, // (dog — it works hard: it's the one shooting)
+  mealValue: 45,
+  autoEatBelow: 20, // driver / dog eat from the stock by themselves below this satiety
+  hungrySpeed: 0.6, // top-speed multiplier while the driver is starving
+  partRepair: 8, // armour restored by one car part
   fuelIdle: 0.25, // fuel/s while the engine runs
   fuelThrottle: 0.95, // extra fuel/s at full throttle & top speed
   noFuelLimit: 4, // seconds stalled with an empty tank before the run ends
 };
 
-// Pickups: the three core resources + fuel.
+// Pickups: the three core resources + fuel. `art` = image in assets/, `size` = drawn width.
+//  scrap   — car parts: repair the truck on the spot, the rest goes to the garage
+//  food    — the driver's food: starving makes the truck slow
+//  dogFood — the dog's food: a hungry dog stops shooting
 export const PICKUPS = {
-  scrap: { name: 'запчасти', min: 2, max: 5 },
-  food: { name: 'еда', min: 1, max: 1 },
-  dogFood: { name: 'корм', min: 1, max: 1 },
+  scrap: { name: 'детали', min: 2, max: 5, art: 'pickScrap', size: 135 },
+  food: { name: 'еда', min: 1, max: 1, art: 'pickFood', size: 105 },
+  dogFood: { name: 'корм', min: 1, max: 1, art: 'pickDogFood', size: 92 },
   fuel: { name: 'топливо', min: 25, max: 35 },
-  ammo: { name: 'патроны', min: 4, max: 8 },
-  repair: { name: 'ремкомплект', min: 25, max: 35 }, // restores truck armour
 };
 
-export const SHOTGUN = {
-  clip: 8,
-  startReserve: 24,
-  range: 560, // px from the truck
-  cooldown: 0.5,
-  reload: 1.4,
+// The dog rides in the bed with a shotgun: unlimited shells, shoots zombies on its own
+// while it is fed.
+export const DOG_GUN = {
+  range: 640, // px from the truck
+  cooldown: 0.6,
 };
 
 // Per-chunk spawn tuning. `d` is difficulty 0..1 growing with distance.
@@ -146,7 +148,7 @@ export const SPAWN = {
   rowChance: (d) => 0.85 + d * 0.15, // chance an even chunk has an obstacle row
   followChance: (d) => d * 0.45, // chance an odd chunk repeats the previous row's lane
   rowJitter: 80, // rows sit at chunk middle ± this
-  pickupChance: { scrap: 0.22, food: 0.08, dogFood: 0.08, fuel: 0.1, ammo: 0.1, repair: 0.14 },
+  pickupChance: { scrap: 0.3, food: 0.12, dogFood: 0.12, fuel: 0.1 },
   graffitiChance: 0.15,
 };
 

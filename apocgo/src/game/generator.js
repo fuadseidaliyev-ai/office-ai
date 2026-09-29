@@ -118,7 +118,7 @@ export function generateChunk(seed, index) {
   for (const [type, chance] of Object.entries(SPAWN.pickupChance)) {
     if (!rng.chance(chance)) continue;
     const onShoulder = rng.chance(0.5);
-    const p = place(rng, top, solids, 44, 44, onShoulder ? DRIVE_HALF - 30 : ROAD_HALF - 30, onShoulder ? ROAD_HALF + 40 : 0);
+    const p = place(rng, top, solids, 80, 80, onShoulder ? DRIVE_HALF - 30 : ROAD_HALF - 30, onShoulder ? ROAD_HALF + 40 : 0);
     if (!p) continue;
     const def = PICKUPS[type];
     const ob = { type, amount: rng.int(def.min, def.max), ...p, t: rng.range(0, 6), taken: false };

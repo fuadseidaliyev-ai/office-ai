@@ -7,7 +7,7 @@ import { Particles } from '../engine/particles.js';
 import { aabbOverlap, aabbPenetration, clamp } from '../engine/math.js';
 import { RNG } from '../engine/rng.js';
 import {
-  ART, BUFFER_W, VIEW_W, VIEW_H, CHUNK_H, DRIVE_HALF, PIXEL, ROAD_HALF, PX_PER_METER, SHOTGUN, SURVIVAL,
+  ART, BUFFER_W, VIEW_W, VIEW_H, CHUNK_H, DRIVE_HALF, PIXEL, ROAD_HALF, PX_PER_METER, DOG_GUN, SURVIVAL,
   ZOMBIE, PICKUPS, OBSTACLES, computeTruckStats, goalMeters,
 } from './config.js';
 import { maskHit } from './collide.js';
@@ -41,22 +41,19 @@ export class World {
 
     this.startInv = { ...save.inventory };
     this.inv = { ...save.inventory };
-    this.gained = { scrap: 0, food: 0, dogFood: 0, fuel: 0, ammo: 0, repair: 0 };
+    this.gained = { scrap: 0, food: 0, dogFood: 0, fuel: 0 };
+    this.repaired = 0; // armour restored by parts this run
     this.kills = 0;
     this.fuelPicked = 0; // canisters found (objective)
 
-    // shotgun: the clip is topped up for free at the start of a run, reloads use inv.ammo
-    this.clip = SHOTGUN.clip;
-    this.inv.ammo = this.inv.ammo ?? 0;
+    // the dog's shotgun (unlimited shells, fires on its own while the dog is fed)
     this.gunCooldown = 0;
-    this.reloadT = 0;
+    this.dogKills = 0;
     this.shots = []; // tracers {x1, y1, x2, y2, t}
     this.muzzle = 0;
 
     this.satiety = 100;
     this.dogSatiety = 100;
-    this.starve = 0;
-    this.dogStarve = 0;
     this.stall = 0;
 
     this.state = 'running'; // 'running' | 'won' | 'lost'
@@ -141,7 +138,7 @@ export class World {
     truck.update(dt, input);
 
     this.updateSurvival(dt, input);
-    this.updateGun(dt, input);
+    this.updateDog(dt);
     this.updateZombies(dt);
     this.collideObstacles();
     this.collectPickups();
@@ -166,14 +163,20 @@ export class World {
 
     if (input.pressed('eat')) this.eat();
     if (input.pressed('feedDog')) this.feedDog();
+    // both eat from the stock by themselves when they get hungry
+    if (this.satiety < SURVIVAL.autoEatBelow && this.inv.food > 0) this.eat();
+    if (this.dogSatiety < SURVIVAL.autoEatBelow && this.inv.dogFood > 0) this.feedDog();
 
-    this.starve = this.satiety <= 0 ? this.starve + dt : 0;
-    this.dogStarve = this.dogSatiety <= 0 ? this.dogStarve + dt : 0;
+    this.truck.hungry = this.satiety <= 0;
 
-    this.warnOnce('hunger', this.satiety < 25, 'Водитель голоден — [E] поесть', '#9fdc6a');
-    this.warnOnce('dog', this.dogSatiety < 25, 'Собака голодна — [Q] покормить', '#f0a24a');
+    this.warnOnce('hunger', this.satiety <= 0, 'Водитель голоден — машина едет медленнее. Ищи еду!', '#9fdc6a');
+    this.warnOnce('dog', this.dogSatiety <= 0, 'Собака голодна и не стреляет. Ищи корм!', '#f0a24a');
     this.warnOnce('fuel', isFuelLow(this.truck), 'Мало топлива!', '#ffcf4a');
-    this.warnOnce('armor', this.truck.hp < this.truck.stats.maxHp * 0.35, 'Броня на исходе — ищи ремкомплекты', '#ff8a75');
+    this.warnOnce('armor', this.truck.hp < this.truck.stats.maxHp * 0.35, 'Машина разбита на треть — собирай детали', '#ff8a75');
+  }
+
+  get dogCanShoot() {
+    return this.dogSatiety > 0;
   }
 
   warnOnce(key, cond, text, color) {
@@ -262,38 +265,20 @@ export class World {
     this.decals.push({ kind: 'art', art: this.rng.pick(ART.blood), x: z.x, y: z.y + 20, flip: this.rng.chance(0.5) });
   }
 
-  // ------------------------------------------------------------ shotgun
+  // ------------------------------------------------------------ the dog's shotgun
 
-  updateGun(dt, input) {
+  updateDog(dt) {
     this.gunCooldown = Math.max(0, this.gunCooldown - dt);
-    if (this.reloadT > 0) {
-      this.reloadT -= dt;
-      if (this.reloadT <= 0) {
-        const n = Math.min(SHOTGUN.clip - this.clip, this.inv.ammo);
-        this.clip += n;
-        this.inv.ammo -= n;
-      }
-      return;
-    }
-    if (input.pressed('reload')) return this.startReload();
-    if (!input.pressed('shoot')) return;
-    if (this.clip <= 0) return this.startReload();
-    if (this.gunCooldown > 0) return;
-    this.shoot();
+    if (!this.dogCanShoot || this.gunCooldown > 0) return;
+    const z = this.target();
+    if (z) this.dogShoot(z);
   }
 
-  startReload() {
-    if (this.reloadT > 0 || this.clip >= SHOTGUN.clip) return;
-    if (this.inv.ammo <= 0) return this.toast('Нет патронов', '#c9745a');
-    this.reloadT = SHOTGUN.reload;
-    this.toast('Перезарядка…', '#b9c3cc');
-  }
-
-  /** The driver fires at the nearest zombie in range (or straight ahead if none). */
+  /** Nearest living zombie within the dog's range. */
   target() {
     const t = this.truck;
     let best = null;
-    let bestD = SHOTGUN.range ** 2;
+    let bestD = DOG_GUN.range ** 2;
     for (const z of this.zombies) {
       if (z.dead) continue;
       const d = (z.x - t.x) ** 2 + (z.y - t.y) ** 2;
@@ -305,24 +290,24 @@ export class World {
     return best;
   }
 
-  shoot() {
+  /** Where the dog sits: the truck bed, behind the cab. */
+  get dogPos() {
     const t = this.truck;
-    const ox = t.x;
-    const oy = t.y - t.h * 0.1; // the cab
-    const z = this.target();
-    const tx = z ? z.x : ox;
-    const ty = z ? z.y : oy - SHOTGUN.range;
-    const angle = Math.atan2(ty - oy, tx - ox);
-    this.clip--;
-    this.gunCooldown = SHOTGUN.cooldown;
+    return { x: t.x, y: t.y + t.h * 0.15 };
+  }
+
+  dogShoot(z) {
+    const { x: ox, y: oy } = this.dogPos;
+    const angle = Math.atan2(z.y - oy, z.x - ox);
+    this.gunCooldown = DOG_GUN.cooldown;
     this.muzzle = 0.08;
-    this.shots.push({ x1: ox, y1: oy, x2: tx, y2: ty, t: 0.12 });
-    this.camera.shake(1.5, 0.1);
+    this.shots.push({ x1: ox, y1: oy, x2: z.x, y2: z.y, t: 0.12 });
+    this.camera.shake(1.2, 0.08);
     this.particles.emit(ox + Math.cos(angle) * 40, oy + Math.sin(angle) * 40, {
       count: 8, colors: ['#fff2b0', '#ffd36b', '#ff9d3a'], speed: 120, angle, spread: 0.6, life: 0.2,
     });
-    if (z) this.killZombie(z, angle);
-    if (this.clip === 0) this.startReload();
+    this.killZombie(z, angle);
+    this.dogKills++;
   }
 
   collideObstacles() {
@@ -373,22 +358,38 @@ export class World {
       if (p.taken || !aabbOverlap(p, tb)) continue;
       p.taken = true;
       const name = PICKUPS[p.type].name;
-      if (p.type === 'repair') {
-        const before = this.truck.hp;
-        this.truck.hp = Math.min(this.truck.stats.maxHp, this.truck.hp + p.amount);
-        this.toast(`Ремонт: +${Math.round(this.truck.hp - before)} брони`, '#7fe07a');
-        this.particles.emit(this.truck.x, this.truck.y, { count: 14, colors: ['#7fe07a', '#d8f5c0'], speed: 70, life: 0.6 });
+      if (p.type === 'scrap') {
+        this.useParts(p.amount);
       } else if (p.type === 'fuel') {
         this.truck.fuel = Math.min(this.truck.stats.maxFuel, this.truck.fuel + p.amount);
         this.fuelPicked++;
         this.toast(`+${p.amount} ${name}`, '#ffcf4a');
       } else {
         this.inv[p.type] += p.amount;
-        const colors = { scrap: '#b9c3cc', food: '#9fdc6a', dogFood: '#f0a24a', ammo: '#e0b25a' };
+        const colors = { food: '#9fdc6a', dogFood: '#f0a24a' };
         this.toast(`+${p.amount} ${name}`, colors[p.type]);
       }
       this.gained[p.type] += p.amount;
       this.particles.emit(p.x, p.y, { count: 10, colors: ['#fff2b0', '#ffd36b'], speed: 50, life: 0.5 });
+    }
+  }
+
+  /** Parts fix the truck first; whatever isn't needed goes to the garage stock. */
+  useParts(amount) {
+    const t = this.truck;
+    const missing = t.stats.maxHp - t.hp;
+    const used = Math.min(amount, Math.ceil(missing / SURVIVAL.partRepair));
+    if (used > 0) {
+      const before = t.hp;
+      t.hp = Math.min(t.stats.maxHp, t.hp + used * SURVIVAL.partRepair);
+      this.repaired += t.hp - before;
+      this.toast(`Ремонт: +${Math.round(t.hp - before)} брони`, '#7fe07a');
+      this.particles.emit(t.x, t.y, { count: 14, colors: ['#7fe07a', '#d8f5c0'], speed: 70, life: 0.6 });
+    }
+    const left = amount - used;
+    if (left > 0) {
+      this.inv.scrap += left;
+      this.toast(`+${left} ${PICKUPS.scrap.name} в запас`, '#b9c3cc');
     }
   }
 
@@ -400,8 +401,6 @@ export class World {
     const t = this.truck;
     if (t.y <= this.goalY) return this.end('won', 'Вы добрались до радиовышки!');
     if (t.hp <= 0) return this.end('lost', 'Машина разбита');
-    if (this.dogStarve > SURVIVAL.starveLimit) return this.end('lost', 'Собака погибла от голода');
-    if (this.starve > SURVIVAL.starveLimit) return this.end('lost', 'Водитель умер от голода');
     this.stall = t.fuel <= 0 && Math.abs(t.speed) < 15 ? this.stall + dt : 0;
     if (this.stall > SURVIVAL.noFuelLimit) return this.end('lost', 'Кончилось топливо');
   }

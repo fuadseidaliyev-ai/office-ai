@@ -21,12 +21,14 @@ export class Truck {
     this.steer = 0; // smoothed steering wheel position, −1..1
     this.braking = false;
     this.offroad = false;
+    this.hungry = false; // set by the world when the driver is starving
   }
 
   get maxSpeedNow() {
     let m = this.stats.maxSpeed;
     if (this.offroad) m *= this.stats.offroad;
     if (this.slow > 0) m *= 0.6;
+    if (this.hungry) m *= SURVIVAL.hungrySpeed;
     return m;
   }
 
