@@ -186,12 +186,12 @@ test('hunger never ends the run: a starving driver is slow, a hungry dog stops s
   // a zombie right next to the truck is ignored by the hungry dog…
   assert.equal(w.dogKills, 0);
   w.truck.speed = 0;
-  w.zombies = [{ x: w.truck.x + 200, y: w.truck.y - 300, w: 44, h: 80, speed: 0, chaseSpeed: 0, dir: 0, t: 0, dead: false }];
+  w.zombies = [{ x: w.truck.x + 300, y: w.truck.y + 30, w: 44, h: 80, speed: 0, chaseSpeed: 0, dir: 0, t: 0, dead: false }];
   w.update(1 / 60, fakeInput());
   assert.equal(w.dogKills, 0);
   // …until it finds food: it eats it and starts shooting again
   w.pickups = [{ type: 'dogFood', amount: 1, x: w.truck.x, y: w.truck.y, w: 30, h: 30, t: 0, taken: false }];
-  for (let i = 0; i < 5; i++) w.update(1 / 60, fakeInput());
+  for (let i = 0; i < 20; i++) w.update(1 / 60, fakeInput());
   assert.ok(w.dogSatiety > 0);
   assert.equal(w.dogKills, 1);
 });
@@ -222,7 +222,7 @@ test('the dog shoots zombies by itself with unlimited shells', () => {
   const w = new World({ save: defaultSave(), seed: 3 });
   const z = (x, y) => ({ x, y, w: 44, h: 80, speed: 0, chaseSpeed: 0, dir: 0, t: 0, dead: false });
   for (let n = 1; n <= 20; n++) {
-    w.zombies = [z(w.truck.x + 150, w.truck.y - 400)];
+    w.zombies = [z(w.truck.x + 60, w.truck.y - 400)];
     for (let i = 0; i < 60; i++) w.update(1 / 60, fakeInput());
     assert.equal(w.kills, n);
   }
@@ -250,20 +250,29 @@ test('armour is lost only in obstacle collisions — zombies never cost armour',
   assert.equal(t.hp, t.stats.maxHp);
 });
 
-test('the dog turns the machine gun toward its target before firing', () => {
+test('the dog fires strictly in 4 directions, switching pose before the first shot', () => {
   const w = new World({ save: defaultSave(), seed: 12 });
   w.obstacles = [];
-  const p = w.dogPivot;
-  // a zombie behind-right of the truck: the gun must swing ~135° first
-  w.zombies = [{ x: p.x + 300, y: p.y + 300, w: 44, h: 80, speed: 0, chaseSpeed: 0, dir: 0, t: 0, dead: false }];
-  w.update(1 / 60, fakeInput());
-  assert.equal(w.dogKills, 0, 'no shot before the gun is aimed');
-  for (let i = 0; i < 40 && w.dogKills === 0; i++) w.update(1 / 60, fakeInput());
-  assert.equal(w.dogKills, 1);
-  assert.ok(Math.abs(w.dogAim - (3 * Math.PI) / 4) < 0.25, `aim ${w.dogAim}`);
-  // the muzzle sits at the end of the barrel in the aim direction
-  const m = w.dogPos;
-  assert.ok(m.x > w.dogPivot.x && m.y > w.dogPivot.y);
+  w.pickups = [];
+  const t = w.truck;
+  const zombie = (x, y) => ({ x, y, w: 44, h: 80, speed: 0, chaseSpeed: 0, dir: 0, t: 0, dead: false });
+  // forward, right, back, left of the truck
+  const spots = [[0, -400], [350, 30], [0, 400], [-350, 30]];
+  spots.forEach(([dx, dy], dir) => {
+    w.zombies = [zombie(t.x + dx, t.y + dy)];
+    const kills = w.dogKills;
+    w.update(1 / 60, fakeInput());
+    if (dir !== 0) assert.equal(w.dogKills, kills, 'no shot before turning to the new side');
+    for (let i = 0; i < 60 && w.dogKills === kills; i++) w.update(1 / 60, fakeInput());
+    assert.equal(w.dogKills, kills + 1, `direction ${dir}`);
+    assert.equal(w.dogDir, dir);
+    assert.ok(Math.abs(w.dogAim - (t.tilt + (dir * Math.PI) / 2)) < 1e-9);
+  });
+  // a diagonal zombie is outside every corridor: the dog does not shoot at it
+  w.zombies = [zombie(t.x + 300, t.y - 300)];
+  const kills = w.dogKills;
+  for (let i = 0; i < 60; i++) w.update(1 / 60, fakeInput());
+  assert.equal(w.dogKills, kills);
 });
 
 test('the truck cannot leave the road and all resources lie on the road', () => {

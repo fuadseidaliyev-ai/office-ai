@@ -50,7 +50,9 @@ export class World {
 
     // the dog's shotgun (unlimited shells, fires on its own while the dog is fed)
     this.gunCooldown = 0;
-    this.dogAim = 0; // turret angle, world space: 0 = straight up the road, clockwise
+    this.dogAim = 0; // firing angle, world space: 0 = straight up the road, clockwise
+    this.dogDir = 0; // 0 forward, 1 right, 2 back, 3 left (relative to the truck)
+    this.dogSwitch = 0;
     this.dogKills = 0;
     this.shots = []; // tracers {x1, y1, x2, y2, t}
     this.muzzle = 0;
@@ -300,55 +302,72 @@ export class World {
 
   updateDog(dt) {
     this.gunCooldown = Math.max(0, this.gunCooldown - dt);
-    const z = this.dogCanShoot ? this.target() : null;
-    // swing the gun toward the target (or back to the front when idle)
-    const p = this.dogPivot;
-    const want = z ? Math.atan2(z.x - p.x, -(z.y - p.y)) : this.truck.tilt;
-    const diff = wrapAngle(want - this.dogAim);
-    const step = DOG_GUN.turnSpeed * dt;
-    this.dogAim = wrapAngle(this.dogAim + clamp(diff, -step, step));
-    if (z && this.gunCooldown <= 0 && Math.abs(wrapAngle(want - this.dogAim)) < DOG_GUN.aimTolerance) {
-      this.dogShoot(z);
+    this.dogSwitch = Math.max(0, this.dogSwitch - dt);
+    const hit = this.dogCanShoot ? this.target() : null;
+    const dir = hit ? hit.dir : 0; // idle: facing forward
+    if (dir !== this.dogDir) {
+      this.dogDir = dir;
+      this.dogSwitch = DOG_GUN.switchTime; // turning to the new side
     }
+    this.dogAim = this.truck.tilt + (this.dogDir * Math.PI) / 2;
+    if (hit && this.gunCooldown <= 0 && this.dogSwitch <= 0) this.dogShoot(hit.z, hit.along);
   }
 
-  /** Nearest living zombie within the dog's range. */
-  target() {
+  /** Truck-local coordinates of a world point (x right, y back; forward is −y). */
+  toTruckLocal(x, y) {
     const t = this.truck;
-    let best = null;
-    let bestD = DOG_GUN.range ** 2;
-    for (const z of this.zombies) {
-      if (z.dead) continue;
-      const d = (z.x - t.x) ** 2 + (z.y - t.y) ** 2;
-      if (d < bestD) {
-        bestD = d;
-        best = z;
-      }
-    }
-    return best;
+    const c = Math.cos(t.tilt);
+    const s = Math.sin(t.tilt);
+    const dx = x - t.x;
+    const dy = y - t.y;
+    return { x: dx * c + dy * s, y: -dx * s + dy * c };
   }
 
-  /** The turret pivot (the dog's shoulders) in world space; it rides with the truck. */
-  get dogPivot() {
+  /** Truck-local offset → world point. */
+  fromTruckLocal({ x, y }) {
     const t = this.truck;
-    const { x, y } = DOG_GUN.pivot;
     const c = Math.cos(t.tilt);
     const s = Math.sin(t.tilt);
     return { x: t.x + x * c - y * s, y: t.y + x * s + y * c };
   }
 
-  /** The muzzle: end of the barrel, wherever the dog is pointing it. */
-  get dogPos() {
-    const p = this.dogPivot;
-    return { x: p.x + Math.sin(this.dogAim) * DOG_GUN.barrel, y: p.y - Math.cos(this.dogAim) * DOG_GUN.barrel };
+  /**
+   * Nearest living zombie inside one of the 4 firing corridors:
+   * { z, dir (0 fwd, 1 right, 2 back, 3 left), along (distance along the firing line) }.
+   */
+  target() {
+    let best = null;
+    for (const z of this.zombies) {
+      if (z.dead) continue;
+      const l = this.toTruckLocal(z.x, z.y);
+      // [along, across] for forward, right, back, left
+      const axes = [[-l.y, l.x], [l.x, l.y], [l.y, l.x], [-l.x, l.y]];
+      axes.forEach(([along, across], dir) => {
+        if (along <= 0 || along > DOG_GUN.range || Math.abs(across) > DOG_GUN.corridor) return;
+        if (!best || along < best.along) best = { z, dir, along };
+      });
+    }
+    return best;
   }
 
-  dogShoot(z) {
+  /** The forward pose's pivot in world space (rides with the truck). */
+  get dogPivot() {
+    return this.fromTruckLocal(DOG_GUN.pivot);
+  }
+
+  /** The muzzle of the current pose, in world space. */
+  get dogPos() {
+    return this.fromTruckLocal(DOG_GUN.poses[this.dogDir].muzzle);
+  }
+
+  dogShoot(z, along) {
     const { x: ox, y: oy } = this.dogPos;
-    const angle = Math.atan2(z.y - oy, z.x - ox);
+    // bullets fly straight along the firing line, up to the zombie
+    const angle = this.dogAim - Math.PI / 2;
+    const len = Math.max(40, along - 60);
     this.gunCooldown = DOG_GUN.cooldown;
     this.muzzle = 0.08;
-    this.shots.push({ x1: ox, y1: oy, x2: z.x, y2: z.y, t: 0.12 });
+    this.shots.push({ x1: ox, y1: oy, x2: ox + Math.cos(angle) * len, y2: oy + Math.sin(angle) * len, t: 0.12 });
     this.camera.shake(1.2, 0.08);
     this.particles.emit(ox + Math.cos(angle) * 40, oy + Math.sin(angle) * 40, {
       count: 8, colors: ['#fff2b0', '#ffd36b', '#ff9d3a'], speed: 120, angle, spread: 0.6, life: 0.2,
@@ -500,10 +519,4 @@ export class World {
       keptScrap: inv.scrap - this.startInv.scrap,
     };
   }
-}
-
-
-/** Normalise an angle to (−π, π]. */
-function wrapAngle(a) {
-  return Math.atan2(Math.sin(a), Math.cos(a));
 }

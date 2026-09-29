@@ -147,13 +147,22 @@ export const PICKUPS = {
 
 // The dog rides in the bed with a shotgun: unlimited shells, shoots zombies on its own
 // while it is fed.
+// It fires strictly in 4 directions relative to the truck (forward / right / back /
+// left), at zombies inside that direction's corridor, each with its own pose art.
 export const DOG_GUN = {
-  range: 640, // px from the truck
+  range: 640, // px along the firing line
+  corridor: 120, // half-width of the strip along each firing line that gets hit
   cooldown: 0.45,
-  turnSpeed: 7, // rad/s the dog swings the gun around
-  aimTolerance: 0.18, // rad: fires once the barrel points this close to the target
-  pivot: { x: 0.5, y: 10 }, // turret pivot relative to the truck centre (truckGun art)
-  barrel: 105, // pivot → muzzle distance
+  switchTime: 0.15, // s to turn to another direction before the first shot
+  pivot: { x: 0.5, y: 10 }, // forward pose pivot relative to the truck centre
+  // per direction (truck-local, 0 = forward, clockwise): pose sprite (null = the forward
+  // turret art), where it sits and where the muzzle is, relative to the truck centre
+  poses: [
+    { art: null, at: { x: 0.5, y: 10 }, muzzle: { x: 0.5, y: -95 } },
+    { art: 'dogRight', flip: false, scale: 1.22, at: { x: 6, y: 40 }, muzzle: { x: 90, y: 38 } },
+    { art: 'dogBack', flip: false, scale: 1.22, at: { x: -2, y: 23 }, muzzle: { x: 8, y: 86 } },
+    { art: 'dogRight', flip: true, scale: 1.22, at: { x: -6, y: 40 }, muzzle: { x: -90, y: 38 } },
+  ],
 };
 
 // Per-chunk spawn tuning. `d` is difficulty 0..1 growing with distance.

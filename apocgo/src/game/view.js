@@ -363,15 +363,20 @@ function drawTruck(ctx, world) {
   }
   ctx.restore();
 
-  // the dog at the machine gun, turning toward whatever it shoots at
-  const dog = art.dogGunner;
-  if (dog && art.truckGun && !blink) {
-    const p = world.dogPivot;
-    ctx.save();
-    ctx.translate(Math.round(p.x), Math.round(p.y));
-    ctx.rotate(world.dogAim);
-    ctx.drawImage(dog, -dog.width / 2, -dog.height / 2);
-    ctx.restore();
+  // the dog at the machine gun, in the pose for the side it is firing to
+  if (art.dogGunner && art.truckGun && !blink) {
+    const pose = DOG_GUN.poses[world.dogDir];
+    const img = pose.art ? art[pose.art] : art.dogGunner;
+    if (img) {
+      const p = world.fromTruckLocal(pose.at);
+      const k = pose.scale ?? 1;
+      ctx.save();
+      ctx.translate(Math.round(p.x), Math.round(p.y));
+      ctx.rotate(t.tilt);
+      if (pose.flip) ctx.scale(-1, 1);
+      ctx.drawImage(img, (-img.width / 2) * k, (-img.height / 2) * k, img.width * k, img.height * k);
+      ctx.restore();
+    }
   }
 }
 

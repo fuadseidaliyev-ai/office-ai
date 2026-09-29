@@ -6,7 +6,7 @@
 //  * everything else is a sprite placed and scaled by its distance, drawn far → near.
 // The simulation is untouched; only drawing differs.
 
-import { BUFFER_W, BUFFER_H, CHUNK_H, OBSTACLE_ART_SCALE, PERSP, PICKUPS, VIEW_H } from './config.js';
+import { BUFFER_W, BUFFER_H, CHUNK_H, DOG_GUN, OBSTACLE_ART_SCALE, PERSP, PICKUPS, VIEW_H } from './config.js';
 import { art } from './art.js';
 import { bushSprite, pickupSprite, radioTowerSprite, vignette } from './sprites.js';
 import { drawGround, hazardImage, isFlashing } from './view.js';
@@ -324,10 +324,12 @@ function drawTruck(ctx, cam, world) {
       ctx.fill();
     }
   }
-  // the dog at the machine gun, turned toward its target
+  // the dog at the machine gun, in the pose for the side it is firing to
   if (art.dogGunner && art.truckGun && !blink) {
-    const p = world.dogPivot;
-    drawFlat(ctx, cam, art.dogGunner, p.x, p.y, { rot: world.dogAim, lift: 0.25 });
+    const pose = DOG_GUN.poses[world.dogDir];
+    const p = world.fromTruckLocal(pose.at);
+    const img = pose.art ? art[pose.art] : art.dogGunner;
+    drawFlat(ctx, cam, img, p.x, p.y, { rot: world.truck.tilt, flip: pose.flip, scale: pose.scale ?? 1, lift: 0.25 });
   }
 }
 
