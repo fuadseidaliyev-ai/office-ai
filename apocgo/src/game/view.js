@@ -114,6 +114,7 @@ export function drawWorld(ctx, world, { hideTruck = false, debug = false } = {})
   const left = Math.floor(cam.left) - 120;
   const right = Math.ceil(cam.right) + 120;
   drawGround(ctx, world, top, bottom, left, right);
+  drawSkids(ctx, world);
 
   for (const pk of world.pickups) drawPickup(ctx, pk, world.time);
 
@@ -149,6 +150,19 @@ export function drawWorld(ctx, world, { hideTruck = false, debug = false } = {})
  * edges, markings, decals and flat obstacles. Used by the top-down view directly and by
  * the chase view (rendered into its ground buffer, then projected).
  */
+function drawSkids(ctx, world) {
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 16;
+  for (const s of world.skids) {
+    const fade = Math.max(0, 1 - s.age / 7);
+    ctx.strokeStyle = `rgba(14,10,8,${s.a * fade})`;
+    ctx.beginPath();
+    ctx.moveTo(s.x1, s.y1);
+    ctx.lineTo(s.x2, s.y2);
+    ctx.stroke();
+  }
+}
+
 export function drawGround(ctx, world, top, bottom, left, right) {
   const p = getPatterns(ctx);
   ctx.fillStyle = p.ground;

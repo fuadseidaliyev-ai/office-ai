@@ -15,6 +15,7 @@ import { generateChunk } from './generator.js';
 import { Truck } from './truck.js';
 
 const TOAST_TIME = 2.2;
+const SKID_LIFE = 7; // seconds tyre marks stay on the road
 
 
 export class World {
@@ -37,6 +38,7 @@ export class World {
     this.zombies = [];
     this.pickups = [];
     this.decals = [{ kind: 'finish', y: this.goalY }];
+    this.skids = []; // tyre marks {x1, y1, x2, y2, age, a}
     this.decor = [{ kind: 'tower', x: ROAD_HALF + 420, y: this.goalY - 100 }];
     this.nextChunk = 0;
 
@@ -117,6 +119,26 @@ export class World {
     this.pickups = this.pickups.filter((p) => !p.taken && keep(p));
     this.decals = this.decals.filter((d) => (d.points ? d.points[0][1] : d.y) < limit + 40);
     this.decor = this.decor.filter((d) => d.y < limit + 40);
+    this.skids = this.skids.filter((s) => s.y1 < limit && s.age < SKID_LIFE);
+  }
+
+  /** Rear tyres leave black marks on the asphalt while the truck turns hard. */
+  updateSkids(dt) {
+    const t = this.truck;
+    for (const s of this.skids) s.age += dt;
+    const turning = Math.abs(t.tilt) > 0.3 && Math.abs(t.speed) > 200;
+    const sn = Math.sin(t.tilt);
+    const cs = Math.cos(t.tilt);
+    const wheels = [-62, 62].map((lx) => ({ x: t.x + lx * cs - 118 * sn, y: t.y + lx * sn + 118 * cs }));
+    if (turning && this._lastWheels) {
+      const strength = Math.min(1, (Math.abs(t.tilt) - 0.3) / 0.35);
+      wheels.forEach((w, i) => {
+        const p = this._lastWheels[i];
+        this.skids.push({ x1: p.x, y1: p.y, x2: w.x, y2: w.y, age: 0, a: 0.35 + strength * 0.35 });
+      });
+    }
+    this._lastWheels = turning ? wheels : null;
+    if (this.skids.length > 600) this.skids.splice(0, this.skids.length - 600);
   }
 
   // ------------------------------------------------------------ main update
@@ -145,6 +167,7 @@ export class World {
     this.time += dt;
     const truck = this.truck;
     truck.update(dt, input);
+    this.updateSkids(dt);
 
     this.updateSurvival(dt, input);
     this.updateDog(dt);
@@ -336,13 +359,16 @@ export class World {
 
   collideObstacles() {
     const truck = this.truck;
-    const tb = truck.box;
     for (const ob of this.obstacles) {
       if (!ob.solid) continue;
-      // only the part of the obstacle that is actually drawn hurts (art mask)
-      const hit = maskHit(tb, ob);
-      if (!hit) continue;
-      const pen = aabbPenetration(truck.box, hit);
+      // only the part of the obstacle that is actually drawn hurts (art mask), and only
+      // where the turned truck body actually is
+      let pen = null;
+      for (const box of truck.hitBoxes) {
+        const hit = maskHit(box, ob);
+        pen = hit && aabbPenetration(box, hit);
+        if (pen) break;
+      }
       if (!pen) continue;
       if (pen.y <= pen.x) {
         // head-on (or reversing into it)

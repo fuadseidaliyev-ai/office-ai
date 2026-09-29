@@ -66,9 +66,21 @@ export class Truck {
       this.vx = 0;
     }
 
-    // body heading follows the actual direction of travel, smoothed
-    const heading = Math.atan2(this.vx, Math.max(Math.abs(this.speed), 180)) * 0.9;
-    this.tilt += (heading - this.tilt) * damp(6, dt);
+    // The body swings noticeably into the turn (up to ~47° at full speed), following
+    // the direction it actually moves in, so it straightens out again against a wall.
+    const heading = clamp(Math.atan2(this.vx, Math.max(Math.abs(this.speed) * 0.6, 160)), -0.85, 0.85);
+    this.tilt += (heading - this.tilt) * damp(7, dt);
+  }
+
+  /**
+   * Collision shape of the (possibly rotated) body: three squares along its spine. Much
+   * closer to the drawn truck than one axis-aligned box when it is turned sideways.
+   */
+  get hitBoxes() {
+    const s = Math.sin(this.tilt);
+    const c = Math.cos(this.tilt);
+    const size = this.w * 0.9;
+    return [-100, 0, 100].map((d) => ({ x: this.x - s * d, y: this.y + c * d, w: size, h: size }));
   }
 
   damage(amount) {
