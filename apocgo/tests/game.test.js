@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CHUNK_H, DRIVE_HALF, ROAD_HALF, SAFE_CHUNKS, SPAWN, UPGRADE_KEYS, computeTruckStats, upgradeCost } from '../src/game/config.js';
+import { DRIVE_HALF, ROAD_HALF, SAFE_CHUNKS, UPGRADE_KEYS, computeTruckStats, upgradeCost } from '../src/game/config.js';
 import { generateChunk } from '../src/game/generator.js';
 import { defaultSave, normalizeSave } from '../src/game/save.js';
 import { Truck } from '../src/game/truck.js';
@@ -28,50 +28,61 @@ test('safe chunks have no obstacles, zombies or pickups', () => {
   }
 });
 
-test('obstacles are always dodgeable: rows are far apart and never need a big swerve', () => {
-  const truckHalf = 75;
-  const minRowGap = CHUNK_H - 2 * SPAWN.rowJitter;
-  // how far the (smoothly steering) base truck can shift sideways between two rows at top speed
+test('obstacles are always dodgeable: enough time and room to swerve between rows', () => {
+  const truckHalfW = 75;
+  const truckHalfH = 150;
   const stats = computeTruckStats({});
-  const truck = new Truck(stats);
-  truck.speed = stats.maxSpeed;
-  const hardRight = { down: (a) => a === 'gas' || a === 'right', axis: () => 1 };
-  for (let i = Math.round((minRowGap / stats.maxSpeed) * 60); i > 0; i--) truck.update(1 / 60, hardRight);
-  const maxSwerve = truck.x * 0.85; // keep a safety margin
 
-  // free x-intervals for the truck's centre at one row
-  const freeIntervals = (row) => {
-    let free = [[-DRIVE_HALF, DRIVE_HALF]];
-    for (const o of row) {
-      const lo = o.x - o.w / 2 - truckHalf;
-      const hi = o.x + o.w / 2 + truckHalf;
-      free = free.flatMap(([a, b]) => [[a, Math.min(b, lo)], [Math.max(a, hi), b]]).filter(([a, b]) => b - a > 10);
-    }
-    return free;
+  // lateral distance the base truck covers (from driving straight) in `t` seconds at top speed
+  const swerveIn = (t) => {
+    const truck = new Truck(stats);
+    truck.speed = stats.maxSpeed;
+    const hardRight = { down: (a) => a === 'gas' || a === 'right', axis: () => 1 };
+    for (let i = Math.round(t * 60); i > 0; i--) truck.update(1 / 60, hardRight);
+    return truck.x;
   };
+
+  // free x-intervals for the truck's centre alongside one obstacle (bounding box = conservative)
+  const freeIntervals = (o) => [[-DRIVE_HALF, o.x - o.w / 2 - truckHalfW], [o.x + o.w / 2 + truckHalfW, DRIVE_HALF]]
+    .filter(([a, b]) => b - a > 10);
   const dist = (x, free) => Math.min(...free.map(([a, b]) => (x < a ? a - x : x > b ? x - b : 0)));
 
-  for (let seed = 0; seed < 30; seed++) {
+  for (let seed = 0; seed < 40; seed++) {
     const rows = [];
     for (let i = SAFE_CHUNKS; i < 90; i++) {
-      const solids = generateChunk(seed, i).obstacles.filter((o) => o.solid);
-      if (!solids.length) continue;
-      assert.ok(solids.every((o) => o.y === solids[0].y), 'one row per chunk');
-      rows.push({ y: solids[0].y, free: freeIntervals(solids) });
+      const obs = generateChunk(seed, i).obstacles;
+      assert.ok(obs.length <= 1, 'one obstacle per chunk');
+      if (obs.length) rows.push(obs[0]);
     }
-    for (let k = 0; k < rows.length; k++) {
-      assert.ok(rows[k].free.length > 0, `seed ${seed}: row fully blocked`);
-      if (k === 0) continue;
-      assert.ok(rows[k - 1].y - rows[k].y >= minRowGap, `seed ${seed}: rows too close`);
-      // from anywhere you can pass the previous row, a gap in this row is within reach
-      for (const [a, b] of rows[k - 1].free) {
+    assert.ok(rows.length > 20, `seed ${seed}: the road should not be empty`);
+    for (let k = 1; k < rows.length; k++) {
+      const prev = rows[k - 1]; // nearer (larger y)
+      const cur = rows[k];
+      assert.ok(freeIntervals(cur).length > 0, `seed ${seed}: row fully blocked`);
+      if (cur.lane === prev.lane) continue; // same lane: stay where you are
+      // time from clearing the previous obstacle to reaching the next one
+      const edgeGap = (prev.y - prev.h / 2 - truckHalfH) - (cur.y + cur.h / 2 + truckHalfH);
+      const budget = swerveIn(Math.max(0, edgeGap) / stats.maxSpeed) * 0.85;
+      for (const [a, b] of freeIntervals(prev)) {
         for (let x = a; x <= b; x += 10) {
-          const need = dist(x, rows[k].free);
-          assert.ok(need <= maxSwerve, `seed ${seed}: needs a ${Math.round(need)} px swerve (max ${Math.round(maxSwerve)})`);
+          const need = dist(x, freeIntervals(cur));
+          assert.ok(need <= budget, `seed ${seed}: ${prev.lane}->${cur.lane} needs ${Math.round(need)} px, can do ${Math.round(budget)}`);
         }
       }
     }
   }
+});
+
+test('obstacle collisions follow the drawn shape, not the bounding box', async () => {
+  const { maskHit } = await import('../src/game/collide.js');
+  const { makeObstacle } = await import('../src/game/generator.js');
+  const tree = makeObstacle('tree', 'middle', 0, { range: () => 0, chance: () => false });
+  // the fallen tree runs diagonally: its bounding-box corner at bottom-left is empty ground…
+  const corner = { x: tree.x - tree.w / 2 + 30, y: tree.y - tree.h / 2 + 30, w: 40, h: 40 };
+  assert.equal(maskHit(corner, tree), null);
+  // …while the trunk near the middle is solid
+  const trunk = { x: tree.x + tree.w * 0.15, y: tree.y + tree.h * 0.1, w: 80, h: 80 };
+  assert.ok(maskHit(trunk, tree));
 });
 
 test('repair kits restore armour up to the maximum', () => {

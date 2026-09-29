@@ -2,28 +2,66 @@
 // and unit-testable in Node.
 //
 // A chunk is a horizontal strip of road CHUNK_H tall. Chunk i spans world y in
-// [−(i+1)·CHUNK_H, −i·CHUNK_H). Each chunk holds at most one "row" of blockers near its
-// middle — a single obstacle or a two-piece "gate" with a wide opening — so rows are
-// always ≥ ~650 px apart and the driver has time to change lanes between them.
+// [−(i+1)·CHUNK_H, −i·CHUNK_H). Big obstacles (fallen tree, wrecked cars, road
+// collapse, rock slide) come one per row, in one of three lanes: left, middle or right.
+// Rows sit in even chunks (≥ ~2 chunks apart). With difficulty an odd chunk may add a
+// row in the *same* lane as the previous one — no extra swerve needed — so the road
+// is always passable.
 
 import { RNG, hashSeed } from '../engine/rng.js';
 import { aabbOverlap, clamp } from '../engine/math.js';
 import {
-  ART, CHUNK_H, DECOR, DRIVE_HALF, OBSTACLE_SCALE as S, PICKUPS, ROAD_HALF, SAFE_CHUNKS, SPAWN, ZOMBIE,
+  ART, CHUNK_H, DECOR, DRIVE_HALF, OBSTACLES, OBSTACLE_ART_SCALE, PICKUPS, ROAD_HALF, SAFE_CHUNKS, SPAWN, ZOMBIE,
 } from './config.js';
+import { MASKS } from './masks.js';
 
-
-// Big obstacles. `solid` blocks the truck; w/h ranges in px (the hitbox).
-const BLOCKERS = {
-  collapse: { weight: 3 }, // провал асфальта
-  barricade: { weight: 3, w: [150, 230], h: [80, 110] }, // завал из бочек и покрышек
-  wreck: { weight: 3 }, // брошенная полицейская машина
-  rail: { weight: 2 }, // сорванный отбойник
-  tree: { weight: 2 }, // поваленное дерево
-};
+export const LANES = ['left', 'middle', 'right'];
 
 export function difficultyFor(chunkIndex) {
   return clamp(chunkIndex / SPAWN.difficultyChunks, 0, 1);
+}
+
+/**
+ * The obstacle row of a chunk, if any: { kind, lane }. Uses its own RNG stream so a
+ * chunk can look up its neighbour's row without generating the whole neighbour.
+ */
+export function rowPlan(seed, index) {
+  if (index < SAFE_CHUNKS) return null;
+  const key = `${seed}:${index}`;
+  if (planCache.has(key)) return planCache.get(key);
+  const rng = new RNG(hashSeed(seed, index, 'row'));
+  const d = difficultyFor(index);
+  const weights = Object.fromEntries(Object.entries(OBSTACLES).map(([k, v]) => [k, v.weight]));
+  // a row right after another one (one chunk apart) must keep its lane
+  const prev = rowPlan(seed, index - 1);
+  let plan = null;
+  if (index % 2 === 0) {
+    if (rng.chance(SPAWN.rowChance(d))) plan = { kind: rng.weighted(weights), lane: prev ? prev.lane : rng.pick(LANES) };
+  } else if (prev && rng.chance(SPAWN.followChance(d))) {
+    // odd chunk: optional follow-up row in the same lane as the previous one
+    plan = { kind: rng.weighted(weights), lane: prev.lane };
+  }
+  if (planCache.size > 4000) planCache.clear();
+  planCache.set(key, plan);
+  return plan;
+}
+
+const planCache = new Map();
+
+/** Build the obstacle object for a row (position, size, collision mask, mirroring). */
+export function makeObstacle(kind, lane, y, rng) {
+  const def = OBSTACLES[kind];
+  const mask = MASKS[def.art];
+  const k = OBSTACLE_ART_SCALE;
+  const w = Math.round(mask.w * k);
+  const h = Math.round(mask.h * k);
+  const inset = def.inset ?? 20; // how far the art may poke past the asphalt edge
+  const x = lane === 'left' ? -ROAD_HALF + w / 2 - inset
+    : lane === 'right' ? ROAD_HALF - w / 2 + inset
+      : rng.range(-40, 40);
+  // art is painted for one side of the road; mirror it when placed on the other one
+  const flip = lane === 'middle' ? rng.chance(0.5) : (lane === 'left') !== (def.side === 'left');
+  return { kind, lane, art: def.art, mask: def.art, x, y, w, h, flip, solid: true, ground: !!def.ground };
 }
 
 export function generateChunk(seed, index) {
@@ -52,32 +90,13 @@ export function generateChunk(seed, index) {
     });
   }
 
-  // 1. At most one row of blockers per chunk.
-  if (rng.chance(SPAWN.rowChance(d))) {
-    const rowY = top + CHUNK_H / 2 + rng.range(-SPAWN.rowJitter, SPAWN.rowJitter);
-    const weights = Object.fromEntries(Object.entries(BLOCKERS).map(([k, v]) => [k, v.weight]));
-    const edge = ROAD_HALF + 60; // blockers stay on / near the asphalt
-    const row = [];
-    if (rng.chance(SPAWN.gateChance(d))) {
-      // gate: two blockers with a clear opening of SPAWN.gateGap between them
-      const half = SPAWN.gateGap / 2;
-      const gx = rng.range(-ROAD_HALF + 200, ROAD_HALF - 200);
-      const l = makeBlocker(rng, rng.weighted(weights));
-      const r = makeBlocker(rng, rng.weighted(weights));
-      l.x = gx - half - l.w / 2;
-      r.x = gx + half + r.w / 2;
-      if (l.x - l.w / 2 >= -edge) row.push(l);
-      if (r.x + r.w / 2 <= edge) row.push(r);
-    } else {
-      const ob = makeBlocker(rng, rng.weighted(weights));
-      ob.x = rng.range(-edge + ob.w / 2, edge - ob.w / 2);
-      row.push(ob);
-    }
-    for (const ob of row) {
-      ob.y = rowY;
-      out.obstacles.push(ob);
-      solids.push(ob);
-    }
+  // 1. The obstacle row.
+  const plan = rowPlan(seed, index);
+  if (plan) {
+    const y = top + CHUNK_H / 2 + rng.range(-SPAWN.rowJitter, SPAWN.rowJitter);
+    const ob = makeObstacle(plan.kind, plan.lane, y, rng);
+    out.obstacles.push(ob);
+    solids.push(ob);
   }
 
   // 2. Zombies.
@@ -108,47 +127,6 @@ export function generateChunk(seed, index) {
   }
 
   return out;
-}
-
-function makeBlocker(rng, kind) {
-  const base = { kind, solid: true, seed: rng.int(0, 1e9), flip: rng.chance(0.5) };
-  switch (kind) {
-    case 'wreck': {
-      // police car art is 302x175, seen from the side; vertical = rotated 90°
-      const horizontal = rng.chance(0.6);
-      const [a, b] = [Math.round(270 * S), Math.round(140 * S)];
-      return { ...base, w: horizontal ? a : b, h: horizontal ? b : a, horizontal };
-    }
-    case 'collapse': {
-      const w = Math.round(rng.range(180, 300) * S);
-      return { ...base, w, h: Math.round(w * 0.72) };
-    }
-    case 'rail':
-      // guardrail art (drawn at a slant in the concept) rotated to lie across the road
-      return { ...base, w: Math.round(300 * S), h: Math.round(56 * S) };
-    case 'tree':
-      // tree art (≈180 tall) lying across the road
-      return { ...base, art: rng.pick(['tree1', 'tree2']), w: Math.round(180 * S), h: Math.round(70 * S) };
-    case 'barricade': {
-      const w = Math.round(rng.range(...BLOCKERS.barricade.w) * S);
-      const h = Math.round(rng.range(...BLOCKERS.barricade.h) * S);
-      const pieces = [];
-      for (let i = rng.int(5, 8); i > 0; i--) {
-        pieces.push({
-          art: rng.pick([...ART.barrels, ...ART.tires, 'crate']),
-          dx: rng.range(-w / 2 + 25 * S, w / 2 - 25 * S),
-          dy: rng.range(-h / 2 + 20 * S, h / 2 - 15 * S),
-          flip: rng.chance(0.5),
-        });
-      }
-      pieces.sort((a, b) => a.dy - b.dy);
-      return { ...base, w, h, pieces };
-    }
-    default: {
-      const def = BLOCKERS[kind];
-      return { ...base, w: Math.round(rng.range(...def.w)), h: Math.round(rng.range(...def.h)) };
-    }
-  }
 }
 
 /**

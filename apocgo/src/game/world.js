@@ -8,19 +8,14 @@ import { aabbOverlap, aabbPenetration, clamp } from '../engine/math.js';
 import { RNG } from '../engine/rng.js';
 import {
   ART, BUFFER_W, VIEW_W, VIEW_H, CHUNK_H, DRIVE_HALF, PIXEL, ROAD_HALF, PX_PER_METER, SHOTGUN, SURVIVAL,
-  ZOMBIE, PICKUPS, computeTruckStats, goalMeters,
+  ZOMBIE, PICKUPS, OBSTACLES, computeTruckStats, goalMeters,
 } from './config.js';
+import { maskHit } from './collide.js';
 import { generateChunk } from './generator.js';
 import { Truck } from './truck.js';
 
 const TOAST_TIME = 2.2;
-const OBSTACLE_NAMES = {
-  collapse: 'провал',
-  wreck: 'брошенная машина',
-  rail: 'отбойник',
-  tree: 'дерево',
-  barricade: 'завал',
-};
+
 
 export class World {
   constructor({ save, seed = (Math.random() * 1e9) | 0 }) {
@@ -226,7 +221,7 @@ export class World {
       if (Math.abs(z.x - ox) > 0.01) z.face = z.x > ox ? 1 : -1;
       // zombies don't walk through blockers
       for (const ob of this.obstacles) {
-        if (ob.solid && aabbOverlap(z, ob)) {
+        if (ob.solid && maskHit(z, ob)) {
           z.x = ox;
           z.y = oy;
           z.dir += Math.PI / 2;
@@ -335,16 +330,17 @@ export class World {
     const tb = truck.box;
     for (const ob of this.obstacles) {
       if (!ob.solid) continue;
-      // collapses are round holes: only the ellipse inside the hitbox hurts
-      if (ob.kind === 'collapse' && !rectHitsEllipse(tb, ob)) continue;
-      const pen = aabbPenetration(truck.box, ob);
+      // only the part of the obstacle that is actually drawn hurts (art mask)
+      const hit = maskHit(tb, ob);
+      if (!hit) continue;
+      const pen = aabbPenetration(truck.box, hit);
       if (!pen) continue;
       if (pen.y <= pen.x) {
         // head-on (or reversing into it)
         truck.y += pen.y * pen.sy;
         const impact = Math.abs(truck.speed);
         if (impact > 70 && truck.invuln <= 0) {
-          const dmg = impact * (ob.kind === 'collapse' ? 0.048 : 0.036);
+          const dmg = impact * (ob.kind === 'hole' ? 0.048 : 0.036);
           truck.damage(dmg);
           truck.invuln = 0.5;
           this.hitFlash = 1;
@@ -354,7 +350,7 @@ export class World {
             count: 16, colors: ['#ffd36b', '#ff9d3a', '#6f6861'], speed: 110,
             angle: pen.sy > 0 ? -Math.PI / 2 : Math.PI / 2, spread: 2.2, life: 0.4,
           });
-          this.toast(`Удар: ${OBSTACLE_NAMES[ob.kind] || 'препятствие'} −${Math.max(1, Math.round(dmg))} брони`, '#ff6a55');
+          this.toast(`Удар: ${OBSTACLES[ob.kind]?.name || 'препятствие'} −${Math.max(1, Math.round(dmg))} брони`, '#ff6a55');
         }
         truck.speed = pen.sy > 0 ? -Math.max(0, truck.speed) * 0.25 : Math.max(0, truck.speed);
       } else {
@@ -446,13 +442,4 @@ export class World {
 
 function isFuelLow(truck) {
   return truck.fuel < truck.stats.maxFuel * 0.2;
-}
-
-/** Does the centre-based rect touch the ellipse inscribed in box `e`? */
-function rectHitsEllipse(r, e) {
-  const nx = clamp(e.x, r.x - r.w / 2, r.x + r.w / 2);
-  const ny = clamp(e.y, r.y - r.h / 2, r.y + r.h / 2);
-  const dx = (nx - e.x) / (e.w / 2);
-  const dy = (ny - e.y) / (e.h / 2);
-  return dx * dx + dy * dy < 1;
 }

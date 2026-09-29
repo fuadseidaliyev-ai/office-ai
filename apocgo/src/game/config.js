@@ -14,9 +14,17 @@ export const UI_W = 480;
 export const UI_H = 270;
 // Procedural pixel sprites (pickups, rubble…) are drawn at this scale to match the art.
 export const PIXEL = 3;
-// Obstacles are drawn (and collide) smaller than in the concept art, so the truck has
-// room to weave between them.
-export const OBSTACLE_SCALE = 0.72;
+// Big road obstacles, cut from the road references in tools/obstacles/. World units per
+// art pixel for them (the references are drawn at a slightly larger scale than the truck).
+export const OBSTACLE_ART_SCALE = 0.95;
+// `side`: which side of the road the art was painted on (it is mirrored for the other).
+// `ground`: flat on the road (drawn under pickups and zombies).
+export const OBSTACLES = {
+  tree: { art: 'obstTree', name: 'поваленное дерево', side: 'right', weight: 3 },
+  cars: { art: 'obstCars', name: 'разбитые машины', side: 'left', weight: 3 },
+  hole: { art: 'obstHole', name: 'провал', side: 'right', weight: 3, ground: true, inset: -40 },
+  rocks: { art: 'obstRocks', name: 'каменный завал', side: 'right', weight: 3 },
+};
 
 // World layout. The truck drives "north" (−y).
 export const ROAD_HALF = 520; // asphalt from −520 to +520
@@ -134,10 +142,9 @@ export const SHOTGUN = {
 export const SPAWN = {
   difficultyChunks: 60, // chunks until difficulty reaches 1
   zombies: (d) => [Math.round(1 + d * 3), Math.round(2 + d * 6)],
-  rowChance: (d) => 0.7 + d * 0.25, // chance a chunk has a row of blockers
-  gateChance: (d) => 0.15 + d * 0.35, // chance that row is a two-piece gate
-  gateGap: 460, // clear opening of a gate (the truck is 150 wide)
-  rowJitter: 110, // rows sit at chunk middle ± this, so rows are ≥ CHUNK_H − 2·jitter apart
+  rowChance: (d) => 0.85 + d * 0.15, // chance an even chunk has an obstacle row
+  followChance: (d) => d * 0.45, // chance an odd chunk repeats the previous row's lane
+  rowJitter: 80, // rows sit at chunk middle ± this
   pickupChance: { scrap: 0.22, food: 0.08, dogFood: 0.08, fuel: 0.1, ammo: 0.1, repair: 0.14 },
   graffitiChance: 0.15,
 };

@@ -2,7 +2,7 @@
 // Layer order (bottom → top): ground, road, markings, decals, holes, pickups,
 // obstacles, zombies, truck, gunfire, particles, roadside decor, screen overlays.
 
-import { BUFFER_W, BUFFER_H, OBSTACLE_SCALE as S, PIXEL, ROAD_HALF } from './config.js';
+import { BUFFER_W, BUFFER_H, OBSTACLE_ART_SCALE, PIXEL, ROAD_HALF } from './config.js';
 import { art } from './art.js';
 import {
   bushSprite, paintSprite, pickupSprite, radioTowerSprite, vignette,
@@ -29,10 +29,10 @@ const noise = (n) => {
 // Obstacles get a warm hazard outline + tint so they read clearly against the grey
 // asphalt; the one just hit flashes red. Variants are rendered once and cached.
 const HAZARD = {
-  normal: { outline: 'rgba(255,138,42,0.9)', tint: 'rgba(255,120,40,0.16)' },
+  normal: { outline: 'rgba(255,150,60,0.55)', tint: 'rgba(255,120,40,0.08)' },
   hit: { outline: 'rgba(255,40,30,1)', tint: 'rgba(255,40,30,0.45)' },
 };
-const HAZARD_PAD = 6; // outline thickness in art pixels
+const HAZARD_PAD = 4; // outline thickness in art pixels
 const hazardCache = new Map();
 
 function hazardImage(name, variant) {
@@ -127,29 +127,13 @@ export function drawWorld(ctx, world, { hideTruck = false, debug = false } = {})
   // ground-level decals (cracks, graffiti, blood)
   for (const d of world.decals) drawDecal(ctx, d);
 
-  // collapses are part of the road surface: art + a hazard ring around the hole
-  for (const ob of world.obstacles) {
-    if (ob.kind !== 'collapse') continue;
-    drawArt(ctx, 'collapse', ob.x, ob.y, { w: ob.w * 1.25, flip: ob.flip });
-    const hit = isFlashing(world, ob);
-    ctx.strokeStyle = hit ? 'rgba(255,40,30,0.95)' : 'rgba(255,138,42,0.8)';
-    ctx.lineWidth = 5;
-    ctx.setLineDash([22, 12]);
-    ctx.beginPath();
-    ctx.ellipse(ob.x, ob.y, ob.w * 0.5, ob.h * 0.5, 0, 0, Math.PI * 2); // == collision ellipse
-    ctx.stroke();
-    ctx.setLineDash([]);
-    if (hit) {
-      ctx.fillStyle = 'rgba(255,40,30,0.25)';
-      ctx.fill();
-    }
-  }
+  // flat obstacles (road collapse) are part of the road surface
+  for (const ob of world.obstacles) if (ob.ground) drawObstacle(ctx, ob, isFlashing(world, ob) ? 'hit' : 'normal');
 
   for (const pk of world.pickups) drawPickup(ctx, pk, world.time);
 
   for (const ob of world.obstacles) {
-    if (ob.kind === 'collapse') continue;
-    drawObstacle(ctx, ob, isFlashing(world, ob) ? 'hit' : 'normal');
+    if (!ob.ground) drawObstacle(ctx, ob, isFlashing(world, ob) ? 'hit' : 'normal');
   }
 
   // zombies — sorted by y so lower ones overlap upper ones
@@ -274,27 +258,20 @@ function isFlashing(world, ob) {
 }
 
 function drawObstacle(ctx, ob, hazard) {
-  switch (ob.kind) {
-    case 'barricade':
-      shadow(ctx, ob.x + 6, ob.y + 12, ob.w * 0.55, ob.h * 0.55, 0.3);
-      for (const p of ob.pieces) drawArt(ctx, p.art, ob.x + p.dx, ob.y + p.dy, { flip: p.flip, scale: S, hazard });
-      break;
-    case 'wreck':
-      shadow(ctx, ob.x + 8, ob.y + 14, ob.w * 0.55, ob.h * 0.5, 0.3);
-      // never mirrored: the art has "POLICE" lettering
-      if (ob.horizontal) drawArt(ctx, 'police', ob.x, ob.y, { scale: S, hazard });
-      else drawArt(ctx, 'police', ob.x, ob.y, { rot: ob.flip ? Math.PI / 2 : -Math.PI / 2, scale: S, hazard });
-      break;
-    case 'rail':
-      shadow(ctx, ob.x + 6, ob.y + 14, ob.w * 0.5, 16, 0.3);
-      drawArt(ctx, 'guardrail', ob.x, ob.y, { flip: ob.flip, rot: ob.flip ? -0.43 : 0.43, scale: S, hazard });
-      break;
-    case 'tree':
-      drawArt(ctx, ob.art, ob.x, ob.y, { rot: ob.flip ? Math.PI / 2 : -Math.PI / 2, scale: S, hazard });
-      break;
-    default:
-      break;
+  const scale = OBSTACLE_ART_SCALE;
+  if (ob.ground) {
+    // a patch of broken road: no outline (it has soft edges), red wash when hit
+    drawArt(ctx, ob.art, ob.x, ob.y, { flip: ob.flip, scale });
+    if (hazard === 'hit') {
+      ctx.fillStyle = 'rgba(255,40,30,0.3)';
+      ctx.beginPath();
+      ctx.ellipse(ob.x, ob.y, ob.w * 0.32, ob.h * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return;
   }
+  shadow(ctx, ob.x + 14, ob.y + 22, ob.w * 0.42, ob.h * 0.4, 0.28);
+  drawArt(ctx, ob.art, ob.x, ob.y, { flip: ob.flip, scale, hazard });
 }
 
 function drawZombie(ctx, z) {
