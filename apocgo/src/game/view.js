@@ -308,23 +308,66 @@ function drawObstacle(ctx, ob, hazard) {
 }
 
 function drawZombie(ctx, z, world) {
-  // one frame per facing, animated with a shambling bob / sway (runners bob faster)
   const def = zombieType(z);
-  const bob = Math.abs(Math.sin(z.t * (z.type === 'runner' ? 11 : 5))) * 4;
+  const name = `${def.art}${z.facing || 'Down'}`;
   const hit = world.time - (z.hitAt ?? -99) < 0.12;
+  const img = hit ? hazardImage(name, 'hit') : art[name];
+  if (!img) return;
+  // walk cycle from one frame per facing: the legs step (see drawWalking), the body
+  // bobs twice per stride and sways a little
+  const phase = z.step ?? z.t * 6;
+  const bob = Math.abs(Math.sin(phase)) * 3;
   shadow(ctx, z.x + 4, z.y + def.h / 2 + 4, def.w * 0.6, 8);
-  drawArt(ctx, `${def.art}${z.facing || 'Down'}`, z.x, z.y - bob, { rot: Math.sin(z.t * 2.5) * 0.06, hazard: hit ? 'hit' : null });
+  ctx.save();
+  ctx.translate(Math.round(z.x), Math.round(z.y - bob));
+  ctx.rotate(Math.sin(phase * 0.5) * 0.05);
+  drawWalking(ctx, img, z.facing || 'Down', phase);
+  ctx.restore();
+}
+
+const LEGS = 0.42; // lower part of a zombie sprite that is legs
+
+/**
+ * Draw a one-frame sprite (centred on 0,0) with stepping legs. Walking up / down (and
+ * diagonally), the two legs (left / right half of the lower part) stretch and shrink in
+ * turn, so the feet move up and down; walking sideways the legs swing back and forth.
+ */
+function drawWalking(ctx, img, facing, phase) {
+  const w = img.width;
+  const h = img.height;
+  const hip = Math.round(h * (1 - LEGS));
+  const legH = h - hip;
+  const x0 = -w / 2;
+  const y0 = -h / 2;
+  const s = Math.sin(phase);
+  ctx.drawImage(img, 0, 0, w, hip, x0, y0, w, hip); // body
+  if (facing === 'Left' || facing === 'Right') {
+    // side view: the legs swing (shear around the hips)
+    ctx.save();
+    ctx.translate(0, y0 + hip);
+    ctx.transform(1, 0, s * 0.22, 1, 0, 0);
+    ctx.drawImage(img, 0, hip, w, legH, x0, 0, w, legH);
+    ctx.restore();
+    return;
+  }
+  // front / back / diagonal: scissor step, one foot forward while the other is back
+  const half = Math.round(w / 2);
+  const k = 0.13 * s;
+  ctx.drawImage(img, 0, hip, half, legH, x0, y0 + hip, half, legH * (1 + k));
+  ctx.drawImage(img, half, hip, w - half, legH, x0 + half, y0 + hip, w - half, legH * (1 - k));
 }
 
 function drawTruck(ctx, world) {
   const t = world.truck;
-  const img = art.truckGun || art.truck;
+  const lvl = world.lvl;
+  const img = art[lvl.art] || art.truckGun || art.truck;
+  const upgraded = img !== art.truckGun; // levels 2+: the art has its own wheels
   ctx.save();
   ctx.translate(Math.round(t.x), Math.round(t.y));
   ctx.rotate(t.tilt);
 
   // headlight beams from the roof light bar
-  const front = -(img ? img.height : t.h) / 2;
+  const front = lvl.dy - (img ? img.height : t.h) / 2;
   const g = ctx.createLinearGradient(0, front, 0, front - 360);
   g.addColorStop(0, 'rgba(255,226,150,0.20)');
   g.addColorStop(1, 'rgba(255,226,150,0)');
@@ -343,7 +386,7 @@ function drawTruck(ctx, world) {
   // body rolls a little to the outside of the turn, so in a turn the tyres show.
   const turn = t.steer; // −1..1
   const roll = -turn * TRUCK_ROLL;
-  if (!blink) {
+  if (!blink && !upgraded) {
     const tyre = tyreSprite();
     const wheelAngle = turn * FRONT_STEER;
     for (const [wx, wy, front] of TRUCK_WHEELS) {
@@ -354,12 +397,13 @@ function drawTruck(ctx, world) {
       ctx.restore();
     }
   }
-  if (img && !blink) ctx.drawImage(img, -img.width / 2 + roll, -img.height / 2);
+  if (img && !blink) ctx.drawImage(img, -img.width / 2 + roll, lvl.dy - img.height / 2);
   if (t.braking && img) {
+    const [bx, by] = lvl.brakeLights || [68, img.height / 2 - 46];
     ctx.fillStyle = 'rgba(255,50,30,0.35)';
     ctx.beginPath();
-    ctx.arc(-68, img.height / 2 - 46, 24, 0, Math.PI * 2);
-    ctx.arc(68, img.height / 2 - 46, 24, 0, Math.PI * 2);
+    ctx.arc(-bx, lvl.dy + by, 24, 0, Math.PI * 2);
+    ctx.arc(bx, lvl.dy + by, 24, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
@@ -367,10 +411,11 @@ function drawTruck(ctx, world) {
   // the dog at the machine gun, in the pose for the side it is firing to
   if (art.dogGunner && art.truckGun && !blink) {
     const pose = DOG_GUN.poses[world.dogDir];
-    const img = pose.art ? art[pose.art] : art.dogGunner;
+    const turret = world.dogDir === 0 && lvl.turret;
+    const img = turret ? art[lvl.turret] : pose.art ? art[pose.art] : art.dogGunner;
     if (img) {
-      const p = world.fromTruckLocal(pose.at);
-      const k = pose.scale ?? 1;
+      const p = world.fromTruckLocal(world.poseSpot(world.dogDir, 'at'));
+      const k = turret ? 1 : pose.scale ?? 1;
       ctx.save();
       ctx.translate(Math.round(p.x), Math.round(p.y));
       ctx.rotate(t.tilt);

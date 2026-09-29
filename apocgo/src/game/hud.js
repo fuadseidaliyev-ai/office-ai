@@ -2,6 +2,7 @@
 // UI_W x UI_H (480x270) coordinates.
 
 import { text } from '../engine/text.js';
+import { art } from './art.js';
 import { PORTRAIT, PX_PER_METER, UI_W, UI_H } from './config.js';
 
 const PANEL = 'rgba(14,12,10,0.72)';
@@ -23,6 +24,7 @@ export function drawHud(ui, world, { fps = 0, debug = false, touch = false } = {
 
   drawCompass(ui, world);
   drawVitals(ui, world, blink, layout.vitalsY);
+  drawLevelBanner(ui, world);
 
   // toasts (top-centre)
   world.toasts.forEach((toast, i) => {
@@ -117,28 +119,61 @@ function drawCompass(ui, world) {
 function drawVitals(ui, world, blink, y) {
   const t = world.truck;
   const x = 4;
-  panel(ui, x, y, 92, 34);
+  panel(ui, x, y, 92, 44);
+  // energy: progress toward the next truck level
+  const cur = world.lvl;
+  const next = world.nextLvl;
+  const energy = next ? (world.energy - cur.energy) / (next.energy - cur.energy) : 1;
   const rows = [
     [iconCross, '#c8433a', t.hp / t.stats.maxHp],
     [iconFork, '#4f9a45', world.satiety / 100],
     [iconPaw, '#d9822b', world.dogSatiety / 100],
+    [iconBolt, '#5ec8ff', energy, next ? `УР ${cur.level}` : 'МАКС'],
   ];
-  rows.forEach(([icon, color, v, count, key], i) => {
+  rows.forEach(([icon, color, v, label], i) => {
     const ry = y + 4 + i * 10;
     icon(ui, x + 7, ry + 3.5, color);
     const f = Math.max(0, Math.min(1, v));
     ui.fillStyle = 'rgba(0,0,0,0.55)';
     ui.fillRect(x + 14, ry + 1, 56, 5);
-    ui.fillStyle = f < 0.25 && blink ? '#ffffff' : color;
+    ui.fillStyle = f < 0.25 && blink && !label ? '#ffffff' : color;
     ui.fillRect(x + 14, ry + 1, 56 * f, 5);
     ui.fillStyle = 'rgba(255,255,255,0.12)';
     ui.fillRect(x + 14, ry + 1, 56 * f, 1.2);
-    if (count !== undefined) {
-      text(ui, `${count}`, x + 76, ry - 0.5, { size: 6, color: INK, shadow: false, bold: true });
-      text(ui, key, x + 88, ry, { size: 5, align: 'right', color: '#8a8474', shadow: false });
-    }
+    if (label) text(ui, label, x + 88, ry - 0.3, { size: 5.5, align: 'right', color: '#bfe6ff', shadow: false, bold: true });
   });
   text(ui, `Детали в запасе: ${world.inv.scrap}`, x + 2, y - 9, { size: 6.5, color: '#c9ced3', bold: true });
+}
+
+function iconBolt(ui, x, y, c) {
+  ui.fillStyle = c;
+  ui.beginPath();
+  ui.moveTo(x + 1, y - 4);
+  ui.lineTo(x - 2.5, y + 0.6);
+  ui.lineTo(x - 0.2, y + 0.6);
+  ui.lineTo(x - 1, y + 4);
+  ui.lineTo(x + 2.5, y - 0.8);
+  ui.lineTo(x + 0.2, y - 0.8);
+  ui.closePath();
+  ui.fill();
+}
+
+/** "УРОВЕНЬ N" plate (art from the level renders) while the truck upgrades. */
+function drawLevelBanner(ui, world) {
+  const b = world.levelBanner;
+  const img = b && art[`bannerL${b.level}`];
+  if (!img) return;
+  const w = Math.min(UI_W - 16, 300);
+  const h = (img.height / img.width) * w;
+  const age = 3 - b.t;
+  ui.save();
+  ui.globalAlpha = Math.min(1, age * 4, b.t * 2);
+  const k = 1 + Math.max(0, 0.25 - age) * 0.8; // pops in
+  const y = PORTRAIT ? 64 : 48;
+  ui.translate(UI_W / 2, y + h / 2);
+  ui.scale(k, k);
+  ui.drawImage(img, -w / 2, -h / 2, w, h);
+  ui.restore();
 }
 
 function iconCross(ui, x, y, c) {

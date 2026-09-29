@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DRIVE_HALF, ROAD_HALF, SAFE_CHUNKS, UPGRADE_KEYS, ZOMBIE_TYPES, computeTruckStats, upgradeCost } from '../src/game/config.js';
-import { generateChunk } from '../src/game/generator.js';
+import { DRIVE_HALF, ROAD_HALF, SAFE_CHUNKS, TRUCK_LEVELS, UPGRADE_KEYS, ZOMBIE_TYPES, computeTruckStats, upgradeCost } from '../src/game/config.js';
+import { generateChunk, makeObstacle } from '../src/game/generator.js';
 import { defaultSave, normalizeSave } from '../src/game/save.js';
+import { RNG } from '../src/engine/rng.js';
 import { Truck } from '../src/game/truck.js';
 import { World } from '../src/game/world.js';
 
@@ -345,4 +346,36 @@ test('three zombie kinds: walkers and runners die from one bullet, the heavy one
   const kinds = new Set();
   for (let i = SAFE_CHUNKS; i < 40; i++) for (const z of generateChunk(4, i).zombies) kinds.add(z.type);
   assert.deepEqual([...kinds].sort(), ['heavy', 'runner', 'walker']);
+});
+
+test('killing zombies charges energy that upgrades the truck: stronger gun, bumper, smashing', () => {
+  const w = new World({ save: defaultSave(), seed: 31 });
+  w.obstacles = [];
+  w.pickups = [];
+  const t = w.truck;
+  assert.equal(w.truckLevel, 1);
+  const zombie = (type) => ({ type, hp: ZOMBIE_TYPES[type].hp, x: t.x + 5000, y: t.y, w: 44, h: 80, speed: 0, chaseSpeed: 0, dir: 0, t: 0, dead: false });
+  // energy per kill depends on the kind; levels come at the thresholds
+  for (let i = 0; i < TRUCK_LEVELS[1].energy; i++) w.killZombie(zombie('walker'));
+  assert.equal(w.truckLevel, 2);
+  assert.ok(w.levelBanner && w.levelBanner.level === 2);
+  assert.ok(w.lvl.gun.cooldown < TRUCK_LEVELS[0].gun.cooldown);
+  while (w.truckLevel < 4) w.killZombie(zombie('heavy'));
+  assert.equal(w.truckLevel, 4);
+  assert.equal(w.nextLvl, null);
+  assert.ok(t.hitBoxes.length === 4, 'the longer truck has a nose box');
+  // the heavy zombie takes fewer bullets now
+  const heavy = zombie('heavy');
+  w.dogShoot(heavy, 300);
+  w.dogShoot(heavy, 300);
+  assert.ok(heavy.dead);
+  // a level-4 truck ploughs through rocks without losing armour
+  const hp = t.hp;
+  w.obstacles = [makeObstacle('rocks', 'middle', t.y - 400, new RNG(1))];
+  w.obstacles[0].x = t.x;
+  t.speed = t.stats.maxSpeed;
+  for (let i = 0; i < 60; i++) w.update(1 / 60, fakeInput(['gas']));
+  assert.equal(t.hp, hp);
+  assert.ok(w.obstacles.every((o) => o.kind !== 'rocks' || o.smashed || o.y > t.y));
+  assert.ok(t.y < -400 + 100, 'drove through');
 });

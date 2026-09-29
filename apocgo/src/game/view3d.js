@@ -292,7 +292,8 @@ function drawZombie(ctx, cam, z) {
 
 function drawTruck(ctx, cam, world) {
   const t = world.truck;
-  const img = art.truckGun || art.truck;
+  const lvl = world.lvl;
+  const img = art[lvl.art] || art.truckGun || art.truck;
   // headlight beams on the road ahead
   const a = project(cam, t.x - 60, t.y - 160);
   const b = project(cam, t.x + 60, t.y - 160);
@@ -313,7 +314,8 @@ function drawTruck(ctx, cam, world) {
   }
   flatShadow(ctx, cam, t.x + 10, t.y + 18, 104, 165, 0.4);
   const blink = t.invuln > 0 && Math.floor(t.invuln * 20) % 2 === 0;
-  if (!blink) drawFlat(ctx, cam, img, t.x, t.y, { rot: t.tilt, lift: 0.15 });
+  const c0 = world.fromTruckLocal({ x: 0, y: lvl.dy });
+  if (!blink) drawFlat(ctx, cam, img, c0.x, c0.y, { rot: t.tilt, lift: 0.15 });
   if (t.braking && !blink) {
     for (const sx of [-68, 68]) {
       const p = project(cam, t.x + sx, t.y + 150);
@@ -327,9 +329,10 @@ function drawTruck(ctx, cam, world) {
   // the dog at the machine gun, in the pose for the side it is firing to
   if (art.dogGunner && art.truckGun && !blink) {
     const pose = DOG_GUN.poses[world.dogDir];
-    const p = world.fromTruckLocal(pose.at);
-    const img = pose.art ? art[pose.art] : art.dogGunner;
-    drawFlat(ctx, cam, img, p.x, p.y, { rot: world.truck.tilt, flip: pose.flip, scale: pose.scale ?? 1, lift: 0.25 });
+    const turret = world.dogDir === 0 && lvl.turret;
+    const p = world.fromTruckLocal(world.poseSpot(world.dogDir, 'at'));
+    const img = turret ? art[lvl.turret] : pose.art ? art[pose.art] : art.dogGunner;
+    drawFlat(ctx, cam, img, p.x, p.y, { rot: world.truck.tilt, flip: !turret && pose.flip, scale: turret ? 1 : pose.scale ?? 1, lift: 0.25 });
   }
 }
 

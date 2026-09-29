@@ -49,6 +49,7 @@ export const OBSTACLES = {
   cars: { art: 'obstCars', name: 'разбитые машины', side: 'left', weight: 3, scale: 0.46 },
   hole: { art: 'obstHole', name: 'провал', side: 'right', weight: 3, ground: true, inset: -40 },
   rocks: { art: 'obstRocks', name: 'каменный завал', side: 'right', weight: 3 },
+  barricade: { art: 'obstBarricade', name: 'деревянная баррикада', side: 'right', weight: 2, scale: 0.55 },
 };
 
 // World layout. The truck drives "north" (−y).
@@ -164,6 +165,29 @@ export const DOG_GUN = {
   ],
 };
 
+// Truck levels. Killing zombies charges energy; at `energy` the truck turns into the next
+// level for the rest of the run (art from tools/levels/). Per level:
+//  art / turret — body sprite and the forward dog + machine gun drawn on it (null: the
+//                 level-1 turret art); turretAt — turret centre from the truck centre
+//  dy / front   — art centre offset and nose distance (bigger trucks stick out forward,
+//                 the rear stays put); muzzle / bed — forward muzzle, side poses' offset
+//  ram          — collision damage multiplier (the reinforced bumper)
+//  smash        — obstacle kinds the truck ploughs through instead of crashing
+//  gun          — the dog's machine gun: seconds between shots, damage per bullet, range
+export const TRUCK_LEVELS = [
+  { level: 1, energy: 0, art: 'truckGun', turret: null, dy: 0, ram: 1, smash: [],
+    gun: { cooldown: 0.45, damage: 1, range: 640 } },
+  { level: 2, energy: 12, art: 'truckL2', dy: -15, front: 192, brakeLights: [62, 137],
+    turret: 'turretL2', turretAt: { x: -2, y: 10 }, muzzle: { x: -2, y: -83 }, bed: { x: 0, y: 18 },
+    ram: 0.6, smash: [], banner: 'bannerL2', gun: { cooldown: 0.32, damage: 1, range: 700 } },
+  { level: 3, energy: 30, art: 'truckL3', dy: -42, front: 246, brakeLights: [75, 159],
+    turret: 'turretL3', turretAt: { x: 2, y: -23.5 }, muzzle: { x: 2, y: -116 }, bed: { x: 0, y: -16 },
+    ram: 0.5, smash: ['tree', 'barricade'], banner: 'bannerL3', gun: { cooldown: 0.24, damage: 2, range: 760 } },
+  { level: 4, energy: 55, art: 'truckL4', dy: -59, front: 280, brakeLights: [80, 171],
+    turret: 'turretL4', turretAt: { x: 1, y: -20 }, muzzle: { x: 1, y: -146 }, bed: { x: 0, y: 16 },
+    ram: 0.4, smash: ['tree', 'barricade', 'rocks', 'cars'], banner: 'bannerL4', gun: { cooldown: 0.16, damage: 3, range: 820 } },
+];
+
 // Per-chunk spawn tuning. `d` is difficulty 0..1 growing with distance.
 export const SPAWN = {
   difficultyChunks: 60, // chunks until difficulty reaches 1
@@ -182,12 +206,13 @@ export const ZOMBIE = {
 };
 
 // Zombie kinds (art from tools/zombies/). `art` + a facing name = file in assets/
-// (z1Down, z2UpRight…); `dirs` = 4 or 8 facings. `hp` = dog bullets to kill;
+// (z1Down, z2UpRight…); `dirs` = 4 or 8 facings. `energy` = truck energy per kill.
+// `hp` = damage to kill (a level-1 bullet does 1);
 // `crash` = armour the truck loses running it over (only the heavy one hurts).
 export const ZOMBIE_TYPES = {
-  walker: { name: 'бродяга', art: 'z1', dirs: 4, weight: 5, hp: 1, crash: 0, w: 44, h: 80, speed: [35, 70], chaseSpeed: [75, 115] },
-  runner: { name: 'бегун', art: 'z2', dirs: 8, weight: 3, hp: 1, crash: 0, w: 44, h: 80, speed: [80, 120], chaseSpeed: [200, 250] },
-  heavy: { name: 'тяжёлый', art: 'z3', dirs: 4, weight: 2, hp: 5, crash: 6, w: 70, h: 100, speed: [25, 45], chaseSpeed: [55, 75] },
+  walker: { name: 'бродяга', art: 'z1', dirs: 4, weight: 5, hp: 1, crash: 0, energy: 1, w: 44, h: 80, speed: [35, 70], chaseSpeed: [75, 115] },
+  runner: { name: 'бегун', art: 'z2', dirs: 8, weight: 3, hp: 1, crash: 0, energy: 2, w: 44, h: 80, speed: [80, 120], chaseSpeed: [200, 250] },
+  heavy: { name: 'тяжёлый', art: 'z3', dirs: 4, weight: 2, hp: 5, crash: 6, energy: 4, w: 70, h: 100, speed: [25, 45], chaseSpeed: [55, 75] },
 };
 /** A zombie's kind definition (zombies without a `type` are walkers). */
 export function zombieType(z) {

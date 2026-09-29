@@ -23,6 +23,7 @@ export class Truck {
     this.braking = false;
     this.offroad = false;
     this.hungry = false; // set by the world when the driver is starving
+    this.front = 162; // nose distance from the centre (upgraded trucks are longer)
   }
 
   get maxSpeedNow() {
@@ -83,7 +84,11 @@ export class Truck {
     const s = Math.sin(this.tilt);
     const c = Math.cos(this.tilt);
     const size = this.w * 0.9;
-    return [-100, 0, 100].map((d) => ({ x: this.x - s * d, y: this.y + c * d, w: size, h: size }));
+    // rear, middle, front; a longer (upgraded) truck gets one more box at its nose
+    const spine = [100, 0, -100];
+    const nose = this.front - size / 2;
+    if (nose > 101) spine.push(-nose);
+    return spine.map((d) => ({ x: this.x - s * d, y: this.y + c * d, w: size, h: size }));
   }
 
   damage(amount) {

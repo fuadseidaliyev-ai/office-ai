@@ -176,6 +176,7 @@ OBSTACLES = {
     'obstCars': ('cars.png', (80, 260, 610, 810), 'cutout'),
     'obstRocks': ('rocks.png', (630, 362, 1195, 830), 'cutout'),
     'obstHole': ('hole.png', (675, 375, 1075, 765), 'patch'),
+    'obstBarricade': ('barricade.png', (160, 285, 780, 540), 'cutout'),
 }
 MASK_CELL = 20  # source px per collision cell
 
@@ -471,8 +472,90 @@ def stretch_tall(img, bands, height):
     return out
 
 
+# Truck levels 2..4 (tools/levels/levelN.png). Per level: the truck crop, the dog crop
+# (cut with birefnet) and the machine gun rectangles; `scale` brings the render to the
+# game's truck scale (rear bumper about as wide as the level-1 truck's).
+TRUCK_LEVELS = {
+    2: {'box': (360, 690, 590, 1080), 'dog': (430, 880, 500, 1020), 'gun': [(455, 815, 480, 905)], 'scale': 0.95},
+    3: {'box': (320, 700, 615, 1255), 'dog': (425, 1000, 515, 1140),
+        'gun': [(455, 885, 490, 1015), (440, 965, 505, 1015)], 'scale': 0.75},
+    4: {'box': (310, 775, 635, 1355), 'dog': (425, 1150, 515, 1290),
+        'gun': [(455, 955, 490, 1175), (440, 1085, 505, 1180)], 'scale': 0.77},
+}
+BANNER_BOX = (75, 52, 870, 225)  # the "УРОВЕНЬ N" plate at the top of each level render
+
+
+def levels():
+    import cv2
+    from rembg import new_session, remove
+    s_truck = new_session('u2net')
+    s_dog = new_session('birefnet-general-lite')
+    for n, spec in TRUCK_LEVELS.items():
+        ref = Image.open(Path(__file__).parent / 'levels' / f'level{n}.png').convert('RGB')
+        arr = np.array(ref)
+        bx0, by0, bx1, by1 = spec['box']
+        truck = np.array(remove(ref.crop(spec['box']), session=s_truck))
+        a = truck[..., 3] >= 140
+        k, lab, stats, _ = cv2.connectedComponentsWithStats(a.astype(np.uint8), 8)
+        a = lab == 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))  # drop the headlight glow
+        # dog + gun, in truck-crop coordinates
+        hole = np.zeros(a.shape, bool)
+        dx0, dy0, dx1, dy1 = spec['dog']
+        dog = np.array(remove(ref.crop(spec['dog']), session=s_dog))[..., 3] >= 140
+        k, lab, stats, _ = cv2.connectedComponentsWithStats(dog.astype(np.uint8), 8)
+        dog = lab == 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
+        hole[dy0 - by0:dy1 - by0, dx0 - bx0:dx1 - bx0] |= dog
+        for gx0, gy0, gx1, gy1 in spec['gun']:
+            hole[gy0 - by0:gy1 - by0, gx0 - bx0:gx1 - bx0] = True
+        region = arr[by0:by1, bx0:bx1]
+        # turret sprite: dog + gun on a transparent canvas the size of the truck crop
+        tur = np.zeros((*a.shape, 4), np.uint8)
+        tur[hole, :3] = region[hole]
+        tur[hole, 3] = 255
+        # truck without them: inpaint the bed where they were
+        grow = cv2.dilate(hole.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+        # fill from the same rows a bit to the side (real texture, no smear); inpaint the rest
+        rgb = region.copy()
+        ys, xs = np.nonzero(grow)
+        rest = grow.copy()
+        for shift in (spec.get('shift', 44), -spec.get('shift', 44)):
+            src = np.clip(xs - shift, 0, grow.shape[1] - 1)
+            ok = rest[ys, xs] & ~grow[ys, src]
+            rgb[ys[ok], xs[ok]] = region[ys[ok], src[ok]]
+            rest[ys[ok], xs[ok]] = False
+        rgb = cv2.inpaint(np.ascontiguousarray(rgb), rest.astype(np.uint8), 6, cv2.INPAINT_TELEA)
+        grow = grow.astype(np.uint8)
+        body = np.dstack([rgb, np.where(a | (grow > 0), 255, 0).astype(np.uint8)])
+        bb = Image.fromarray(body, 'RGBA').getbbox()
+        body, tur = body[bb[1]:bb[3], bb[0]:bb[2]], tur[bb[1]:bb[3], bb[0]:bb[2]]
+        k = spec['scale']
+        size = (round(body.shape[1] * k), round(body.shape[0] * k))
+        for name, img in ((f'truckL{n}', body), (f'turretL{n}', tur)):
+            im = Image.fromarray(img, 'RGBA').resize(size, Image.LANCZOS)
+            px = np.array(im)
+            px[..., 3] = np.where(px[..., 3] >= 128, 255, 0)
+            im = Image.fromarray(px, 'RGBA')
+            if name.startswith('turret'):
+                tb = im.getbbox()
+                # turret centre relative to the truck art centre
+                cx = (tb[0] + tb[2]) / 2 - size[0] / 2
+                cy = (tb[1] + tb[3]) / 2 - size[1] / 2
+                im = im.crop(tb)
+                print(f'{name} {im.size} at {cx:.1f},{cy:.1f}')
+            else:
+                print(f'{name} {im.size}')
+            im.save(OUT / f'{name}.png')
+        banner = ref.crop(BANNER_BOX)
+        banner = banner.resize((banner.width * 3 // 5, banner.height * 3 // 5), Image.LANCZOS)
+        banner.save(OUT / f'bannerL{n}.png')
+    del s_truck, s_dog
+
+
 if __name__ == '__main__':
     import sys
+    if '--levels' in sys.argv:
+        levels()
+        sys.exit()
     if '--buttons' in sys.argv:
         buttons()
         sys.exit()

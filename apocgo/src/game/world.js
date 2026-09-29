@@ -8,7 +8,7 @@ import { aabbOverlap, aabbPenetration, clamp } from '../engine/math.js';
 import { RNG } from '../engine/rng.js';
 import {
   ART, BUFFER_W, PERSP, PORTRAIT, VIEW_W, VIEW_H, CHUNK_H, DRIVE_HALF, PIXEL, ROAD_HALF, PX_PER_METER, DOG_GUN, SURVIVAL,
-  ZOMBIE, ZOMBIE_FACINGS, PICKUPS, zombieType, OBSTACLES, computeTruckStats, goalMeters,
+  TRUCK_LEVELS, ZOMBIE, ZOMBIE_FACINGS, PICKUPS, zombieType, OBSTACLES, computeTruckStats, goalMeters,
 } from './config.js';
 import { maskHit } from './collide.js';
 import { generateChunk } from './generator.js';
@@ -47,6 +47,10 @@ export class World {
     this.gained = { scrap: 0, food: 0, dogFood: 0 };
     this.repaired = 0; // armour restored by parts this run
     this.kills = 0;
+    // energy from kills upgrades the truck during the run (TRUCK_LEVELS)
+    this.energy = 0;
+    this.truckLevel = 1;
+    this.levelBanner = null; // { level, t } while the "УРОВЕНЬ N" plate is shown
 
     // the dog's shotgun (unlimited shells, fires on its own while the dog is fed)
     this.gunCooldown = 0;
@@ -116,7 +120,7 @@ export class World {
   cull() {
     const limit = this.camera.bottom + 300;
     const keep = (e) => e.y < limit;
-    this.obstacles = this.obstacles.filter(keep);
+    this.obstacles = this.obstacles.filter((o) => !o.smashed && keep(o));
     this.zombies = this.zombies.filter((z) => !z.dead && z.y < limit + 60);
     this.pickups = this.pickups.filter((p) => !p.taken && keep(p));
     this.decals = this.decals.filter((d) => (d.points ? d.points[0][1] : d.y) < limit + 40);
@@ -159,6 +163,7 @@ export class World {
     this.particles.update(dt);
     this.camera.update(dt);
     this.hitFlash = Math.max(0, this.hitFlash - dt * 3);
+    if (this.levelBanner && (this.levelBanner.t -= dt) <= 0) this.levelBanner = null;
     for (const t of this.toasts) t.t -= dt;
     this.toasts = this.toasts.filter((t) => t.t > 0);
     for (const s of this.shots) s.t -= dt;
@@ -236,6 +241,8 @@ export class World {
       }
       z.x = clamp(z.x, -DRIVE_HALF - 30, DRIVE_HALF + 30);
       z.facing = facingOf(z, z.x - ox, z.y - oy);
+      // stride phase follows the distance walked (heavy ones take longer steps)
+      z.step = (z.step ?? z.t * 6) + (Math.hypot(z.x - ox, z.y - oy) / (z.type === 'heavy' ? 24 : 16)) * Math.PI;
       // zombies don't walk through blockers
       for (const ob of this.obstacles) {
         if (ob.solid && maskHit(z, ob)) {
@@ -274,9 +281,36 @@ export class World {
     }
   }
 
+  /** The current truck level's definition. */
+  get lvl() {
+    return TRUCK_LEVELS[this.truckLevel - 1];
+  }
+
+  /** The next level up (null at the top). */
+  get nextLvl() {
+    return TRUCK_LEVELS[this.truckLevel] || null;
+  }
+
+  gainEnergy(amount) {
+    this.energy += amount;
+    while (this.nextLvl && this.energy >= this.nextLvl.energy) this.levelUp();
+  }
+
+  levelUp() {
+    this.truckLevel++;
+    this.truck.front = this.lvl.front ?? 162;
+    this.levelBanner = { level: this.truckLevel, t: 3 };
+    this.camera.shake(3, 0.3);
+    this.particles.emit(this.truck.x, this.truck.y, {
+      count: 40, colors: ['#ffe27a', '#ffd36b', '#8fd3ff', '#ffffff'], speed: 160, spread: Math.PI * 2, life: 0.7,
+    });
+  }
+
   killZombie(z, angle = -Math.PI / 2) {
+    if (z.dead) return;
     z.dead = true;
     this.kills++;
+    this.gainEnergy(zombieType(z).energy ?? 1);
     this.particles.emit(z.x, z.y, {
       count: 18, colors: ['#8b1e14', '#6b1a14', '#4a100c', '#9a8a70'], speed: 90,
       angle, spread: 2.2, life: 0.55,
@@ -329,7 +363,7 @@ export class World {
       // [along, across] for forward, right, back, left
       const axes = [[-l.y, l.x], [l.x, l.y], [l.y, l.x], [-l.x, l.y]];
       axes.forEach(([along, across], dir) => {
-        if (along <= 0 || along > DOG_GUN.range || Math.abs(across) > DOG_GUN.corridor) return;
+        if (along <= 0 || along > this.lvl.gun.range || Math.abs(across) > DOG_GUN.corridor) return;
         if (!best || along < best.along) best = { z, dir, along };
       });
     }
@@ -343,7 +377,19 @@ export class World {
 
   /** The muzzle of the current pose, in world space. */
   get dogPos() {
-    return this.fromTruckLocal(DOG_GUN.poses[this.dogDir].muzzle);
+    return this.fromTruckLocal(this.poseSpot(this.dogDir, 'muzzle'));
+  }
+
+  /**
+   * Truck-local point of a dog pose ('at' = where the sprite sits, 'muzzle'). Upgraded
+   * trucks have their own forward turret and the bed sits elsewhere (`bed` offset).
+   */
+  poseSpot(dir, key) {
+    const lvl = this.lvl;
+    if (dir === 0 && lvl.turret) return key === 'at' ? lvl.turretAt : lvl.muzzle;
+    const p = DOG_GUN.poses[dir][key];
+    const bed = lvl.bed || { x: 0, y: 0 };
+    return { x: p.x + bed.x, y: p.y + bed.y };
   }
 
   dogShoot(z, along) {
@@ -351,7 +397,7 @@ export class World {
     // bullets fly straight along the firing line, up to the zombie
     const angle = this.dogAim - Math.PI / 2;
     const len = Math.max(40, along - 60);
-    this.gunCooldown = DOG_GUN.cooldown;
+    this.gunCooldown = this.lvl.gun.cooldown;
     this.muzzle = 0.08;
     this.shots.push({ x1: ox, y1: oy, x2: ox + Math.cos(angle) * len, y2: oy + Math.sin(angle) * len, t: 0.12 });
     this.camera.shake(1.2, 0.08);
@@ -359,7 +405,7 @@ export class World {
       count: 8, colors: ['#fff2b0', '#ffd36b', '#ff9d3a'], speed: 120, angle, spread: 0.6, life: 0.2,
     });
     // the heavy one takes several bullets
-    z.hp = (z.hp ?? zombieType(z).hp) - 1;
+    z.hp = (z.hp ?? zombieType(z).hp) - this.lvl.gun.damage;
     if (z.hp > 0) {
       z.hitAt = this.time;
       this.particles.emit(z.x, z.y, { count: 6, colors: ['#8b1e14', '#6b1a14'], speed: 70, angle, spread: 1.2, life: 0.35 });
@@ -367,6 +413,23 @@ export class World {
     }
     this.killZombie(z, angle);
     this.dogKills++;
+  }
+
+  /** An upgraded truck ploughs through the obstacle: it breaks apart, no armour lost. */
+  smash(ob) {
+    ob.solid = false;
+    ob.smashed = true;
+    const truck = this.truck;
+    truck.speed *= 0.85;
+    this.camera.shake(5, 0.3);
+    const wood = ob.kind === 'tree' || ob.kind === 'barricade';
+    const colors = wood ? ['#6b4a2e', '#8a6440', '#4a3220', '#b08a5a'] : ['#8a857c', '#6f6861', '#a39c90', '#5a3a28'];
+    for (let i = 0; i < 4; i++) {
+      this.particles.emit(ob.x + this.rng.range(-ob.w / 3, ob.w / 3), ob.y + this.rng.range(-ob.h / 4, ob.h / 4), {
+        count: 18, colors, speed: 220, spread: Math.PI * 2, life: 0.9,
+      });
+    }
+    this.toast(`Снёс: ${OBSTACLES[ob.kind]?.name || 'препятствие'}!`, '#ffd36b');
   }
 
   collideObstacles() {
@@ -382,13 +445,17 @@ export class World {
         if (pen) break;
       }
       if (!pen) continue;
+      if (this.lvl.smash.includes(ob.kind) && Math.abs(truck.speed) > ZOMBIE.killSpeed) {
+        this.smash(ob);
+        continue;
+      }
       if (pen.y <= pen.x) {
         // head-on (or reversing into it)
         truck.y += pen.y * pen.sy;
         const impact = Math.abs(truck.speed);
         if (impact > 70 && truck.invuln <= 0) {
           const dmg = impact * (ob.kind === 'hole' ? 0.048 : 0.036);
-          truck.damage(dmg * truck.stats.ram);
+          truck.damage(dmg * truck.stats.ram * this.lvl.ram);
           truck.invuln = 0.5;
           this.hitFlash = 1;
           ob.hitAt = this.time; // the view flashes the obstacle that was hit
