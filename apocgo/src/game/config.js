@@ -19,9 +19,10 @@ export const PIXEL = 3;
 export const OBSTACLE_ART_SCALE = 0.95;
 // `side`: which side of the road the art was painted on (it is mirrored for the other).
 // `ground`: flat on the road (drawn under pickups and zombies).
+// `scale`: per-obstacle override of OBSTACLE_ART_SCALE.
 export const OBSTACLES = {
   tree: { art: 'obstTree', name: 'поваленное дерево', side: 'right', weight: 3 },
-  cars: { art: 'obstCars', name: 'разбитые машины', side: 'left', weight: 3 },
+  cars: { art: 'obstCars', name: 'разбитые машины', side: 'left', weight: 3, scale: 0.66 },
   hole: { art: 'obstHole', name: 'провал', side: 'right', weight: 3, ground: true, inset: -40 },
   rocks: { art: 'obstRocks', name: 'каменный завал', side: 'right', weight: 3 },
 };

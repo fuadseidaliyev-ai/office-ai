@@ -13,7 +13,7 @@ export function maskHit(b, ob) {
   if (!aabbOverlap(b, ob)) return null;
   const mask = MASKS[ob.mask];
   if (!mask) return ob; // no mask: the bounding box is the shape
-  const cs = mask.cell * OBSTACLE_ART_SCALE;
+  const cs = mask.cell * (ob.scale ?? OBSTACLE_ART_SCALE);
   const cols = mask.rows[0].length;
   const rows = mask.rows.length;
   const ox = ob.x - ob.w / 2;

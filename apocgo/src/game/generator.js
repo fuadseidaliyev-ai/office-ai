@@ -52,7 +52,7 @@ const planCache = new Map();
 export function makeObstacle(kind, lane, y, rng) {
   const def = OBSTACLES[kind];
   const mask = MASKS[def.art];
-  const k = OBSTACLE_ART_SCALE;
+  const k = def.scale ?? OBSTACLE_ART_SCALE;
   const w = Math.round(mask.w * k);
   const h = Math.round(mask.h * k);
   const inset = def.inset ?? 20; // how far the art may poke past the asphalt edge
@@ -61,7 +61,7 @@ export function makeObstacle(kind, lane, y, rng) {
       : rng.range(-40, 40);
   // art is painted for one side of the road; mirror it when placed on the other one
   const flip = lane === 'middle' ? rng.chance(0.5) : (lane === 'left') !== (def.side === 'left');
-  return { kind, lane, art: def.art, mask: def.art, x, y, w, h, flip, solid: true, ground: !!def.ground };
+  return { kind, lane, art: def.art, mask: def.art, scale: k, x, y, w, h, flip, solid: true, ground: !!def.ground };
 }
 
 export function generateChunk(seed, index) {

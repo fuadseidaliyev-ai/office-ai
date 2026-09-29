@@ -26,10 +26,9 @@ const noise = (n) => {
   return s - Math.floor(s);
 };
 
-// Obstacles get a warm hazard outline + tint so they read clearly against the grey
-// asphalt; the one just hit flashes red. Variants are rendered once and cached.
+// The obstacle just hit flashes red (outline + tint); otherwise obstacles are drawn
+// exactly as in the art. Variants are rendered once and cached.
 const HAZARD = {
-  normal: { outline: 'rgba(255,150,60,0.55)', tint: 'rgba(255,120,40,0.08)' },
   hit: { outline: 'rgba(255,40,30,1)', tint: 'rgba(255,40,30,0.45)' },
 };
 const HAZARD_PAD = 4; // outline thickness in art pixels
@@ -72,7 +71,7 @@ function hazardImage(name, variant) {
   return c;
 }
 
-/** Draw an art image centred at (x, y). `hazard`: 'normal' | 'hit' adds the obstacle outline. */
+/** Draw an art image centred at (x, y). `hazard: 'hit'` draws the red impact flash. */
 function drawArt(ctx, name, x, y, { flip = false, rot = 0, scale = 1, w = 0, hazard = null } = {}) {
   let img = art[name];
   if (!img) return;
@@ -128,12 +127,12 @@ export function drawWorld(ctx, world, { hideTruck = false, debug = false } = {})
   for (const d of world.decals) drawDecal(ctx, d);
 
   // flat obstacles (road collapse) are part of the road surface
-  for (const ob of world.obstacles) if (ob.ground) drawObstacle(ctx, ob, isFlashing(world, ob) ? 'hit' : 'normal');
+  for (const ob of world.obstacles) if (ob.ground) drawObstacle(ctx, ob, isFlashing(world, ob) ? 'hit' : null);
 
   for (const pk of world.pickups) drawPickup(ctx, pk, world.time);
 
   for (const ob of world.obstacles) {
-    if (!ob.ground) drawObstacle(ctx, ob, isFlashing(world, ob) ? 'hit' : 'normal');
+    if (!ob.ground) drawObstacle(ctx, ob, isFlashing(world, ob) ? 'hit' : null);
   }
 
   // zombies — sorted by y so lower ones overlap upper ones
@@ -258,7 +257,7 @@ function isFlashing(world, ob) {
 }
 
 function drawObstacle(ctx, ob, hazard) {
-  const scale = OBSTACLE_ART_SCALE;
+  const scale = ob.scale ?? OBSTACLE_ART_SCALE;
   if (ob.ground) {
     // a patch of broken road: no outline (it has soft edges), red wash when hit
     drawArt(ctx, ob.art, ob.x, ob.y, { flip: ob.flip, scale });
