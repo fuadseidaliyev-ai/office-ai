@@ -21,12 +21,6 @@ export function hudLayout(touch) {
   };
 }
 
-/** Rects of the tappable food / dog-food rows (UI coords). */
-export function vitalsRows(touch) {
-  const { vitalsY } = hudLayout(touch);
-  return { food: [4, vitalsY + 12, 92, 10], dogFood: [4, vitalsY + 22, 92, 10] };
-}
-
 export function drawHud(ui, world, { fps = 0, debug = false, touch = false } = {}) {
   const t = world.truck;
   const blink = Math.floor(world.time * 4) % 2 === 0;
@@ -161,8 +155,8 @@ function drawVitals(ui, world, blink, y) {
   panel(ui, x, y, 92, 34);
   const rows = [
     [iconCross, '#c8433a', t.hp / t.stats.maxHp],
-    [iconFork, '#4f9a45', world.satiety / 100, world.inv.food, 'E'],
-    [iconPaw, '#d9822b', world.dogSatiety / 100, world.inv.dogFood, 'Q'],
+    [iconFork, '#4f9a45', world.satiety / 100],
+    [iconPaw, '#d9822b', world.dogSatiety / 100],
   ];
   rows.forEach(([icon, color, v, count, key], i) => {
     const ry = y + 4 + i * 10;

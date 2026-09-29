@@ -195,11 +195,7 @@ export class World {
     this.satiety = Math.max(0, this.satiety - SURVIVAL.hungerRate * dt);
     this.dogSatiety = Math.max(0, this.dogSatiety - SURVIVAL.dogHungerRate * dt);
 
-    if (input.pressed('eat')) this.eat();
-    if (input.pressed('feedDog')) this.feedDog();
-    // both eat from the stock by themselves when they get hungry
-    if (this.satiety < SURVIVAL.autoEatBelow && this.inv.food > 0) this.eat();
-    if (this.dogSatiety < SURVIVAL.autoEatBelow && this.inv.dogFood > 0) this.feedDog();
+    // there is no food stock: the bars only rise when food is picked up on the road
 
     this.truck.hungry = this.satiety <= 0;
 
@@ -215,22 +211,6 @@ export class World {
   warnOnce(key, cond, text, color) {
     if (cond && !this._warned[key]) this.toast(text, color);
     this._warned[key] = cond;
-  }
-
-  eat() {
-    if (this.inv.food <= 0) return this.toast('Нет еды', '#c9745a');
-    if (this.satiety > 95) return this.toast('Водитель сыт');
-    this.inv.food--;
-    this.satiety = Math.min(100, this.satiety + SURVIVAL.mealValue);
-    this.toast('Водитель поел', '#9fdc6a');
-  }
-
-  feedDog() {
-    if (this.inv.dogFood <= 0) return this.toast('Нет корма', '#c9745a');
-    if (this.dogSatiety > 95) return this.toast('Собака сыта');
-    this.inv.dogFood--;
-    this.dogSatiety = Math.min(100, this.dogSatiety + SURVIVAL.mealValue);
-    this.toast('Гав! Собака поела', '#f0a24a');
   }
 
   updateZombies(dt) {
@@ -437,26 +417,16 @@ export class World {
     }
   }
 
-  /**
-   * Food is eaten on the spot when the driver / dog isn't full, so the bar rises the
-   * moment it's picked up; otherwise it goes to the stock for later.
-   */
+  /** Food is eaten on the spot: the bar rises the moment it's picked up (nothing is stored). */
   takeFood(type, amount) {
     const key = type === 'food' ? 'satiety' : 'dogSatiety';
     const who = type === 'food' ? 'Водитель поел' : 'Гав! Собака поела';
     const color = type === 'food' ? '#9fdc6a' : '#f0a24a';
-    let left = amount;
-    if (this[key] < 100 && left > 0) {
-      const before = this[key];
-      this[key] = Math.min(100, this[key] + SURVIVAL.mealValue);
-      left--;
-      this.toast(`${who}: +${Math.round(this[key] - before)}`, color);
-    }
-    if (left > 0) {
-      this.inv[type] += left;
-      this.toast(`+${left} ${PICKUPS[type].name} в запас`, color);
-    }
+    const before = this[key];
+    this[key] = Math.min(100, this[key] + SURVIVAL.mealValue * amount);
+    this.toast(`${who}: +${Math.round(this[key] - before)}`, color);
   }
+
 
   /** Parts fix the truck first; whatever isn't needed goes to the garage stock. */
   useParts(amount) {

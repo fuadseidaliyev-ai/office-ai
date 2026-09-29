@@ -304,7 +304,6 @@ function drawObstacle(ctx, ob, hazard) {
     }
     return;
   }
-  shadow(ctx, ob.x + 14, ob.y + 22, ob.w * 0.42, ob.h * 0.4, 0.28);
   drawArt(ctx, ob.art, ob.x, ob.y, { flip: ob.flip, scale, hazard });
 }
 

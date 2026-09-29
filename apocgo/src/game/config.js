@@ -130,7 +130,6 @@ export const SURVIVAL = {
   hungerRate: 1.5, // satiety points lost per second (driver)
   dogHungerRate: 1.6, // (dog — it works hard: it's the one shooting)
   mealValue: 45,
-  autoEatBelow: 20, // driver / dog eat from the stock by themselves below this satiety
   hungrySpeed: 0.6, // top-speed multiplier while the driver is starving
   partRepair: 8, // armour restored by one car part
 };

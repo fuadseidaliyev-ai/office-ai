@@ -260,7 +260,6 @@ function drawDecor(ctx, cam, d) {
 function drawObstacle(ctx, cam, world, ob) {
   const hit = isFlashing(world, ob);
   const img = hit ? hazardImage(ob.art, 'hit') : art[ob.art];
-  flatShadow(ctx, cam, ob.x + 14, ob.y + 22, ob.w * 0.42, ob.h * 0.4, 0.28);
   drawFlat(ctx, cam, img, ob.x, ob.y, { scale: ob.scale ?? OBSTACLE_ART_SCALE, flip: ob.flip, lift: 0.3 });
 }
 

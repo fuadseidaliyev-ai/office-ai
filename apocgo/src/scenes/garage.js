@@ -59,7 +59,7 @@ export class GarageScene {
   renderUI(ui) {
     const { save } = this.game;
     text(ui, 'ГАРАЖ', 16, 10, { size: 24, color: '#e0b25a' });
-    text(ui, `Детали: ${save.inventory.scrap}    Еда: ${save.inventory.food}    Корм: ${save.inventory.dogFood}`, 16, 38, { size: 11, color: '#b9c3cc' });
+    text(ui, `Детали: ${save.inventory.scrap}`, 16, 38, { size: 11, color: '#b9c3cc' });
 
     UPGRADE_KEYS.forEach((key, i) => {
       const y = 58 + i * 30;

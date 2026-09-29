@@ -1,6 +1,6 @@
 import { panel, text } from '../engine/text.js';
 import { UI_W, UI_H, BUFFER_W, BUFFER_H } from '../game/config.js';
-import { drawHud, vitalsRows } from '../game/hud.js';
+import { drawHud } from '../game/hud.js';
 import { drawTouchButtons, touchButtons } from '../game/touchpad.js';
 import { drawWorld } from '../game/view.js';
 import { drawWorld3D } from '../game/view3d.js';
@@ -54,10 +54,6 @@ export class PlayScene {
       return;
     }
 
-    // touch: tapping the food / dog rows of the HUD eats / feeds
-    const rows = vitalsRows(this.game.touchUI);
-    if (input.tapIn(...rows.food)) this.world.eat();
-    if (input.tapIn(...rows.dogFood)) this.world.feedDog();
     this.world.update(dt, input);
     if (this.world.state !== 'running') {
       this.endTimer += dt;

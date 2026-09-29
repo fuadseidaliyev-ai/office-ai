@@ -138,7 +138,7 @@ test('save normalisation fills missing fields', () => {
   assert.deepEqual(normalizeSave('garbage'), defaultSave());
 });
 
-test('headless run: truck drives forward, hunger ticks, eating works', () => {
+test('headless run: truck drives forward, hunger ticks, nothing is eaten from a stock', () => {
   const save = defaultSave();
   const w = new World({ save, seed: 5 });
   const gas = fakeInput(['gas']);
@@ -146,11 +146,11 @@ test('headless run: truck drives forward, hunger ticks, eating works', () => {
   assert.ok(w.distance > 10, `distance ${w.distance}`);
   assert.ok(w.satiety < 100);
 
-  const food = w.inv.food;
   w.satiety = 10;
-  w.update(1 / 60, fakeInput([], ['eat']));
-  assert.equal(w.inv.food, food - 1);
-  assert.ok(w.satiety > 40);
+  w.dogSatiety = 10;
+  w.pickups = [];
+  w.update(1 / 60, fakeInput([], ['eat', 'feedDog']));
+  assert.ok(w.satiety < 10 && w.dogSatiety < 10);
 });
 
 test('a run ends in a win at the goal and in a loss when the truck is wrecked', () => {
@@ -295,12 +295,10 @@ test('picked-up food raises the bar at once; standing still, steering only turns
   w.zombies = [];
   w.satiety = 30;
   w.dogSatiety = 30;
-  const food0 = w.inv.food;
   const at = (type) => ({ type, amount: 1, x: w.truck.x, y: w.truck.y, w: 30, h: 30, t: 0, taken: false });
   w.pickups = [at('food'), at('dogFood')];
   w.update(1 / 60, fakeInput());
   assert.ok(w.satiety > 70 && w.dogSatiety > 70, `${w.satiety} ${w.dogSatiety}`);
-  assert.equal(w.inv.food, food0); // eaten, not stored
 
   w.pickups = [];
   w.truck.speed = 0;
