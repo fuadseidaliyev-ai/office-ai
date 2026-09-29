@@ -5,7 +5,7 @@
 import { BUFFER_W, BUFFER_H, DOG_GUN, OBSTACLE_ART_SCALE, PICKUPS, PIXEL, ROAD_HALF } from './config.js';
 import { art } from './art.js';
 import {
-  bushSprite, paintSprite, pickupSprite, radioTowerSprite, vignette,
+  bushSprite, paintSprite, pickupSprite, radioTowerSprite, tyreSprite, vignette,
 } from './sprites.js';
 
 let patterns = null;
@@ -162,6 +162,11 @@ function drawSkids(ctx, world) {
     ctx.stroke();
   }
 }
+
+// Wheel positions in the truckGun art (centre-relative): [x, y, isFront].
+const TRUCK_WHEELS = [[-80, -90, true], [80, -90, true], [-80, 78, false], [80, 78, false]];
+const FRONT_STEER = 0.6; // rad the front wheels turn at full lock (~35°)
+const TRUCK_ROLL = 6; // px the body shifts to the outside of a turn
 
 export function drawGround(ctx, world, top, bottom, left, right) {
   const p = getPatterns(ctx);
@@ -333,7 +338,22 @@ function drawTruck(ctx, world) {
 
   shadow(ctx, 10, 18, 104, 165, 0.4);
   const blink = t.invuln > 0 && Math.floor(t.invuln * 20) % 2 === 0;
-  if (img && !blink) ctx.drawImage(img, -img.width / 2, -img.height / 2);
+  // Wheels stick out from under the body; the front pair steers with the wheel and the
+  // body rolls a little to the outside of the turn, so in a turn the tyres show.
+  const turn = t.steer; // −1..1
+  const roll = -turn * TRUCK_ROLL;
+  if (!blink) {
+    const tyre = tyreSprite();
+    const wheelAngle = turn * FRONT_STEER;
+    for (const [wx, wy, front] of TRUCK_WHEELS) {
+      ctx.save();
+      ctx.translate(wx, wy);
+      if (front) ctx.rotate(wheelAngle);
+      ctx.drawImage(tyre, -tyre.width / 2, -tyre.height / 2);
+      ctx.restore();
+    }
+  }
+  if (img && !blink) ctx.drawImage(img, -img.width / 2 + roll, -img.height / 2);
   if (t.braking && img) {
     ctx.fillStyle = 'rgba(255,50,30,0.35)';
     ctx.beginPath();

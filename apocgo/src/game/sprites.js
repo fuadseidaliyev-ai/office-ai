@@ -149,3 +149,25 @@ export function vignette(w, h) {
     g.fillRect(0, 0, w, h);
   }));
 }
+
+/** Top-down tyre (width x length in world px): black rubber, tread blocks, rim edge. */
+export function tyreSprite(w = 30, h = 60) {
+  return cached(`tyre_${w}_${h}`, () => make(w, h, (g) => {
+    g.fillStyle = '#0d0b0a';
+    g.beginPath();
+    g.roundRect(0, 0, w, h, 7);
+    g.fill();
+    g.fillStyle = '#242020';
+    g.fillRect(3, 4, w - 6, h - 8);
+    // tread blocks
+    g.fillStyle = '#0a0808';
+    for (let y = 6; y < h - 6; y += 7) {
+      g.fillRect(3, y, w * 0.38, 3);
+      g.fillRect(w * 0.62 - 3, y + 3, w * 0.38, 3);
+    }
+    // worn highlight along the shoulder
+    g.fillStyle = 'rgba(120,110,100,0.35)';
+    g.fillRect(2, 5, 2, h - 10);
+    g.fillRect(w - 4, 5, 2, h - 10);
+  }));
+}
