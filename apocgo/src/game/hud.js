@@ -2,22 +2,17 @@
 // UI_W x UI_H (480x270) coordinates.
 
 import { text } from '../engine/text.js';
-import { art } from './art.js';
 import { PORTRAIT, PX_PER_METER, UI_W, UI_H } from './config.js';
 
 const PANEL = 'rgba(14,12,10,0.72)';
 const BORDER = 'rgba(210,200,180,0.16)';
 const INK = '#e9e4d8';
 
-/**
- * Panel positions. With on-screen driving buttons (`touch`) the vitals and weapon
- * panels move up under the objectives / compass so the bottom corners are free.
- */
+/** Panel positions: the vitals sit in the top-left corner, toasts below them. */
 export function hudLayout(touch) {
   return {
-    vitalsY: touch ? 56 : UI_H - 38,
-    weaponY: touch ? 68 : UI_H - 30,
-    toastY: PORTRAIT ? 134 : touch ? 28 : 14, // portrait: below the panels, clear of them
+    vitalsY: 14,
+    toastY: PORTRAIT ? 134 : touch ? 52 : 14,
   };
 }
 
@@ -26,10 +21,8 @@ export function drawHud(ui, world, { fps = 0, debug = false, touch = false } = {
   const blink = Math.floor(world.time * 4) % 2 === 0;
   const layout = hudLayout(touch);
 
-  drawObjectives(ui, world);
   drawCompass(ui, world);
   drawVitals(ui, world, blink, layout.vitalsY);
-  drawWeapon(ui, world, layout.weaponY);
 
   // toasts (top-centre)
   world.toasts.forEach((toast, i) => {
@@ -69,34 +62,6 @@ function roundRect(ui, x, y, w, h, r) {
   ui.arcTo(x, y + h, x, y, r);
   ui.arcTo(x, y, x + w, y, r);
   ui.closePath();
-}
-
-// ------------------------------------------------------------ objectives (top-left)
-
-function drawObjectives(ui, world) {
-  const rows = [
-    ['Доехать до радиовышки', world.state === 'won'],
-    [`Собрать детали (${Math.min(10, world.gained.scrap)}/10)`, world.gained.scrap >= 10],
-    ['Не разбить машину', world.state === 'won', world.truck.hp < world.truck.stats.maxHp * 0.35],
-  ];
-  panel(ui, 4, 4, 92, 38);
-  text(ui, 'ЦЕЛИ:', 8, 6, { size: 6.5, color: INK, bold: true, shadow: false });
-  rows.forEach(([label, done, danger], i) => {
-    const y = 15 + i * 8.5;
-    ui.strokeStyle = danger ? '#ff5a45' : 'rgba(233,228,216,0.75)';
-    ui.lineWidth = 0.6;
-    ui.strokeRect(8.5, y + 0.8, 5, 5);
-    if (done) {
-      ui.strokeStyle = '#9fdc6a';
-      ui.lineWidth = 1;
-      ui.beginPath();
-      ui.moveTo(9.3, y + 3.3);
-      ui.lineTo(10.8, y + 5);
-      ui.lineTo(13.6, y + 1.2);
-      ui.stroke();
-    }
-    text(ui, label, 17, y, { size: 6.2, color: done ? '#8a8474' : danger ? '#ff8a75' : INK, shadow: false });
-  });
 }
 
 // ------------------------------------------------------------ compass + route (top-right)
@@ -147,7 +112,7 @@ function drawCompass(ui, world) {
   text(ui, `${kmh} км/ч`, cx, cy + r + 10, { size: 5.5, align: 'center', color: '#b8ab8c' });
 }
 
-// ------------------------------------------------------------ vitals (bottom-left)
+// ------------------------------------------------------------ vitals (top-left)
 
 function drawVitals(ui, world, blink, y) {
   const t = world.truck;
@@ -208,24 +173,4 @@ function iconPaw(ui, x, y, c) {
     ui.arc(x + dx, y + dy, 0.9, 0, Math.PI * 2);
   }
   ui.fill();
-}
-
-// ------------------------------------------------------------ shotgun (bottom-right)
-
-/** The dog's shotgun: unlimited shells, but only while the dog is fed. */
-function drawWeapon(ui, world, y) {
-  const w = 64;
-  const h = 26;
-  const x = UI_W - w - 4;
-  const fed = world.dogCanShoot;
-  panel(ui, x, y, w, h);
-  if (art.shotgun) {
-    const s = (w - 8) / art.shotgun.width;
-    ui.globalAlpha = fed ? 1 : 0.35;
-    ui.drawImage(art.shotgun, x + 4, y + 3, art.shotgun.width * s, art.shotgun.height * s);
-    ui.globalAlpha = 1;
-  }
-  iconPaw(ui, x + 8, y + 18, fed ? '#d9822b' : '#7a5a4a');
-  text(ui, fed ? 'стреляет' : 'голодна', x + 14, y + 14.5, { size: 6, color: fed ? '#cbbf9f' : '#ff8a75', shadow: false, bold: !fed });
-  text(ui, '∞', x + w - 4, y + 11, { size: 11, align: 'right', color: fed ? INK : '#7a5a4a', bold: true, shadow: false });
 }

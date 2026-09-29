@@ -4,17 +4,22 @@
 
 import { text } from '../engine/text.js';
 import { art } from './art.js';
-import { UI_W, UI_H } from './config.js';
+import { PORTRAIT, UI_W, UI_H } from './config.js';
 
 export function touchButtons() {
   return [
     // sizes follow the button art's proportions (assets/btn*.png)
-    { action: 'left', label: '', icon: 'left', art: 'btnLeft', x: 6, y: UI_H - 60, w: 52, h: 54 },
-    { action: 'right', label: '', icon: 'right', art: 'btnRight', x: 62, y: UI_H - 60, w: 52, h: 54 },
+    // steering sits higher than the pedals (easier for the thumb in portrait)
+    { action: 'left', label: '', icon: 'left', art: 'btnLeft', x: 6, y: UI_H - steerLift() - 60, w: 52, h: 54 },
+    { action: 'right', label: '', icon: 'right', art: 'btnRight', x: 62, y: UI_H - steerLift() - 60, w: 52, h: 54 },
     { action: 'gas', label: 'ГАЗ', icon: 'gas', art: 'btnGas', x: UI_W - 52, y: UI_H - 109, w: 46, h: 103 },
     { action: 'brake', label: 'ТОРМОЗ', icon: 'brake', art: 'btnBrake', x: UI_W - 100, y: UI_H - 92, w: 44, h: 86 },
     { action: 'pause', label: '', icon: 'pause', x: UI_W / 2 - 14, y: 4, w: 28, h: 18 },
   ];
+}
+
+function steerLift() {
+  return PORTRAIT ? 64 : 30;
 }
 
 /** Is this a touch-first device (phone / tablet)? */

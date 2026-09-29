@@ -7,7 +7,7 @@ import { Particles } from '../engine/particles.js';
 import { aabbOverlap, aabbPenetration, clamp } from '../engine/math.js';
 import { RNG } from '../engine/rng.js';
 import {
-  ART, BUFFER_W, PERSP, VIEW_W, VIEW_H, CHUNK_H, DRIVE_HALF, PIXEL, ROAD_HALF, PX_PER_METER, DOG_GUN, SURVIVAL,
+  ART, BUFFER_W, PERSP, PORTRAIT, VIEW_W, VIEW_H, CHUNK_H, DRIVE_HALF, PIXEL, ROAD_HALF, PX_PER_METER, DOG_GUN, SURVIVAL,
   ZOMBIE, ZOMBIE_FACINGS, PICKUPS, zombieType, OBSTACLES, computeTruckStats, goalMeters,
 } from './config.js';
 import { maskHit } from './collide.js';
@@ -31,7 +31,7 @@ export class World {
     this.relayout();
     this.camera.zoom = BUFFER_W / VIEW_W;
     this.camera.shakeScale = PIXEL;
-    this.camera.snap(0, this.truck.y - VIEW_H * 0.22);
+    this.camera.snap(0, this.truck.y - truckLead());
     this.particles = new Particles(900, PIXEL);
 
     this.obstacles = [];
@@ -100,7 +100,7 @@ export class World {
 
   ensureChunks() {
     // generate up to the top of the top-down view or the chase camera's horizon
-    const ahead = Math.min(this.camera.top, this.camera.y + VIEW_H * 0.22 - PERSP.far);
+    const ahead = Math.min(this.camera.top, this.camera.y + truckLead() - PERSP.far);
     while (-this.nextChunk * CHUNK_H > ahead - CHUNK_H) {
       const c = generateChunk(this.seed, this.nextChunk++);
       // nothing spawns past the finish line
@@ -183,9 +183,9 @@ export class World {
       });
     }
 
-    const lookAhead = clamp(truck.speed, 0, 900) * 0.3;
+    const lookAhead = clamp(truck.speed, 0, 900) * (PORTRAIT ? 0.12 : 0.3);
     // keep the truck in the lower part of the screen so the road ahead is visible early
-    this.camera.follow(truck.x * 0.3, truck.y - VIEW_H * 0.22 - lookAhead, dt, 5);
+    this.camera.follow(truck.x * 0.3, truck.y - truckLead() - lookAhead, dt, 5);
     this.ensureChunks();
     this.cull();
     this.checkEnd(dt);
@@ -511,4 +511,12 @@ function facingOf(z, dx, dy) {
   const n = names.length;
   const i = Math.round((Math.atan2(dy, dx) / (Math.PI * 2)) * n);
   return names[((i % n) + n) % n];
+}
+
+/**
+ * How far below the screen centre the truck sits at rest. Portrait shows a lot of road,
+ * so the truck sits higher there (clear of the driving buttons).
+ */
+function truckLead() {
+  return VIEW_H * (PORTRAIT ? 0.07 : 0.22);
 }
