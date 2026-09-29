@@ -64,6 +64,18 @@ export function pickupSprite(type) {
       px('#5a3514', 3, 3, 1, 1);
       px('#5a3514', 6, 3, 1, 1);
       px('#5a3514', 4, 3, 2, 1);
+    } else if (type === 'repair') {
+      // red toolbox with a wrench on the lid
+      px('#3a1410', 0, 3, 10, 7);
+      px('#c0392b', 1, 4, 8, 5);
+      px('#e05a48', 1, 4, 8, 1);
+      px('#3a1410', 3, 1, 4, 1); // handle
+      px('#3a1410', 3, 1, 1, 3);
+      px('#3a1410', 6, 1, 1, 3);
+      px('#e8e4da', 2, 7, 1, 1); // wrench
+      px('#e8e4da', 3, 6, 1, 1);
+      px('#e8e4da', 4, 5, 3, 1);
+      px('#e8e4da', 7, 4, 1, 3);
     } else if (type === 'ammo') {
       px('#3a2a1a', 0, 2, 10, 7);
       px('#6b4a2a', 1, 3, 8, 5);

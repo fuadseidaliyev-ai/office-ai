@@ -119,6 +119,7 @@ export const PICKUPS = {
   dogFood: { name: 'корм', min: 1, max: 1 },
   fuel: { name: 'топливо', min: 25, max: 35 },
   ammo: { name: 'патроны', min: 4, max: 8 },
+  repair: { name: 'ремкомплект', min: 25, max: 35 }, // restores truck armour
 };
 
 export const SHOTGUN = {
@@ -133,8 +134,11 @@ export const SHOTGUN = {
 export const SPAWN = {
   difficultyChunks: 60, // chunks until difficulty reaches 1
   zombies: (d) => [Math.round(1 + d * 3), Math.round(2 + d * 6)],
-  blockerChance: (d) => 0.35 + d * 0.45, // per band (3 bands per chunk)
-  pickupChance: { scrap: 0.22, food: 0.08, dogFood: 0.08, fuel: 0.1, ammo: 0.1 },
+  rowChance: (d) => 0.7 + d * 0.25, // chance a chunk has a row of blockers
+  gateChance: (d) => 0.15 + d * 0.35, // chance that row is a two-piece gate
+  gateGap: 460, // clear opening of a gate (the truck is 150 wide)
+  rowJitter: 110, // rows sit at chunk middle ± this, so rows are ≥ CHUNK_H − 2·jitter apart
+  pickupChance: { scrap: 0.22, food: 0.08, dogFood: 0.08, fuel: 0.1, ammo: 0.1, repair: 0.14 },
   graffitiChance: 0.15,
 };
 

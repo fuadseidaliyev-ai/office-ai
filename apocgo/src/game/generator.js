@@ -2,8 +2,9 @@
 // and unit-testable in Node.
 //
 // A chunk is a horizontal strip of road CHUNK_H tall. Chunk i spans world y in
-// [−(i+1)·CHUNK_H, −i·CHUNK_H). Each chunk is split into 3 "bands"; a band holds at
-// most one big blocker, which keeps the road always passable.
+// [−(i+1)·CHUNK_H, −i·CHUNK_H). Each chunk holds at most one "row" of blockers near its
+// middle — a single obstacle or a two-piece "gate" with a wide opening — so rows are
+// always ≥ ~650 px apart and the driver has time to change lanes between them.
 
 import { RNG, hashSeed } from '../engine/rng.js';
 import { aabbOverlap, clamp } from '../engine/math.js';
@@ -11,7 +12,6 @@ import {
   ART, CHUNK_H, DECOR, DRIVE_HALF, OBSTACLE_SCALE as S, PICKUPS, ROAD_HALF, SAFE_CHUNKS, SPAWN, ZOMBIE,
 } from './config.js';
 
-const BANDS = 3;
 
 // Big obstacles. `solid` blocks the truck; w/h ranges in px (the hitbox).
 const BLOCKERS = {
@@ -52,16 +52,32 @@ export function generateChunk(seed, index) {
     });
   }
 
-  // 1. One optional blocker per band.
-  const bandH = CHUNK_H / BANDS;
-  for (let b = 0; b < BANDS; b++) {
-    if (!rng.chance(SPAWN.blockerChance(d))) continue;
-    const kind = rng.weighted(Object.fromEntries(Object.entries(BLOCKERS).map(([k, v]) => [k, v.weight])));
-    const ob = makeBlocker(rng, kind);
-    ob.x = rng.range(-ROAD_HALF - 60 + ob.w / 2, ROAD_HALF + 60 - ob.w / 2);
-    ob.y = top + b * bandH + rng.range(ob.h / 2 + 10, bandH - ob.h / 2 - 10);
-    out.obstacles.push(ob);
-    solids.push(ob);
+  // 1. At most one row of blockers per chunk.
+  if (rng.chance(SPAWN.rowChance(d))) {
+    const rowY = top + CHUNK_H / 2 + rng.range(-SPAWN.rowJitter, SPAWN.rowJitter);
+    const weights = Object.fromEntries(Object.entries(BLOCKERS).map(([k, v]) => [k, v.weight]));
+    const edge = ROAD_HALF + 60; // blockers stay on / near the asphalt
+    const row = [];
+    if (rng.chance(SPAWN.gateChance(d))) {
+      // gate: two blockers with a clear opening of SPAWN.gateGap between them
+      const half = SPAWN.gateGap / 2;
+      const gx = rng.range(-ROAD_HALF + 200, ROAD_HALF - 200);
+      const l = makeBlocker(rng, rng.weighted(weights));
+      const r = makeBlocker(rng, rng.weighted(weights));
+      l.x = gx - half - l.w / 2;
+      r.x = gx + half + r.w / 2;
+      if (l.x - l.w / 2 >= -edge) row.push(l);
+      if (r.x + r.w / 2 <= edge) row.push(r);
+    } else {
+      const ob = makeBlocker(rng, rng.weighted(weights));
+      ob.x = rng.range(-edge + ob.w / 2, edge - ob.w / 2);
+      row.push(ob);
+    }
+    for (const ob of row) {
+      ob.y = rowY;
+      out.obstacles.push(ob);
+      solids.push(ob);
+    }
   }
 
   // 2. Zombies.

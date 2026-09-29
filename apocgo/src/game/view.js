@@ -136,7 +136,7 @@ export function drawWorld(ctx, world, { hideTruck = false, debug = false } = {})
     ctx.lineWidth = 5;
     ctx.setLineDash([22, 12]);
     ctx.beginPath();
-    ctx.ellipse(ob.x, ob.y, ob.w * 0.56, ob.h * 0.58, 0, 0, Math.PI * 2);
+    ctx.ellipse(ob.x, ob.y, ob.w * 0.5, ob.h * 0.5, 0, 0, Math.PI * 2); // == collision ellipse
     ctx.stroke();
     ctx.setLineDash([]);
     if (hit) {

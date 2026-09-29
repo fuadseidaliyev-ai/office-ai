@@ -18,6 +18,7 @@ export class Truck {
     this.invuln = 0; // brief invulnerability after a heavy hit
     this.slow = 0; // seconds of pothole slowdown
     this.throttle = 0;
+    this.steer = 0; // smoothed steering wheel position, −1..1
     this.braking = false;
     this.offroad = false;
   }
@@ -33,7 +34,12 @@ export class Truck {
     const s = this.stats;
     this.throttle = input.down('gas') && this.fuel > 0 ? 1 : 0;
     this.braking = input.down('brake');
-    const steer = input.axis('left', 'right');
+    // The wheel turns gradually instead of snapping: it ramps toward the input, and
+    // returns to centre a bit faster than it turns in.
+    const want = input.axis('left', 'right');
+    const returning = want === 0 || Math.sign(want) !== Math.sign(this.steer);
+    this.steer = approach(this.steer, want, (returning ? 7 : 3.2) * dt);
+    const steer = this.steer;
 
     this.offroad = Math.abs(this.x) > ROAD_HALF;
     this.invuln = Math.max(0, this.invuln - dt);
@@ -50,7 +56,7 @@ export class Truck {
     // Lateral: steering authority grows with speed, never zero so you can wiggle free.
     const authority = clamp(Math.abs(this.speed) / 200, 0.25, 1);
     const targetVx = steer * s.handling * authority;
-    this.vx += (targetVx - this.vx) * damp(this.offroad ? 6 : 10, dt);
+    this.vx += (targetVx - this.vx) * damp(this.offroad ? 4.5 : 6, dt);
 
     this.x += this.vx * dt;
     this.y -= this.speed * dt;
@@ -59,7 +65,9 @@ export class Truck {
       this.vx = 0;
     }
 
-    this.tilt += ((this.vx / s.handling) * 0.18 - this.tilt) * damp(12, dt);
+    // body heading follows the actual direction of travel, smoothed
+    const heading = Math.atan2(this.vx, Math.max(Math.abs(this.speed), 180)) * 0.9;
+    this.tilt += (heading - this.tilt) * damp(6, dt);
 
     // Fuel.
     const load = this.throttle * clamp(this.speed / s.maxSpeed, 0.3, 1);

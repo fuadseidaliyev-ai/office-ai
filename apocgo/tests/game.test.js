@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DRIVE_HALF, ROAD_HALF, SAFE_CHUNKS, UPGRADE_KEYS, computeTruckStats, upgradeCost } from '../src/game/config.js';
+import { CHUNK_H, DRIVE_HALF, ROAD_HALF, SAFE_CHUNKS, SPAWN, UPGRADE_KEYS, computeTruckStats, upgradeCost } from '../src/game/config.js';
 import { generateChunk } from '../src/game/generator.js';
 import { defaultSave, normalizeSave } from '../src/game/save.js';
+import { Truck } from '../src/game/truck.js';
 import { World } from '../src/game/world.js';
 
 /** Minimal Input stand-in: a set of held actions, optional one-shot presses. */
@@ -27,19 +28,71 @@ test('safe chunks have no obstacles, zombies or pickups', () => {
   }
 });
 
-test('the road is always passable: every row leaves a gap wider than the truck', () => {
-  const truckW = 150;
-  for (let seed = 0; seed < 20; seed++) {
-    for (let i = SAFE_CHUNKS; i < 80; i++) {
+test('obstacles are always dodgeable: rows are far apart and never need a big swerve', () => {
+  const truckHalf = 75;
+  const minRowGap = CHUNK_H - 2 * SPAWN.rowJitter;
+  // how far the (smoothly steering) base truck can shift sideways between two rows at top speed
+  const stats = computeTruckStats({});
+  const truck = new Truck(stats);
+  truck.speed = stats.maxSpeed;
+  const hardRight = { down: (a) => a === 'gas' || a === 'right', axis: () => 1 };
+  for (let i = Math.round((minRowGap / stats.maxSpeed) * 60); i > 0; i--) truck.update(1 / 60, hardRight);
+  const maxSwerve = truck.x * 0.85; // keep a safety margin
+
+  // free x-intervals for the truck's centre at one row
+  const freeIntervals = (row) => {
+    let free = [[-DRIVE_HALF, DRIVE_HALF]];
+    for (const o of row) {
+      const lo = o.x - o.w / 2 - truckHalf;
+      const hi = o.x + o.w / 2 + truckHalf;
+      free = free.flatMap(([a, b]) => [[a, Math.min(b, lo)], [Math.max(a, hi), b]]).filter(([a, b]) => b - a > 10);
+    }
+    return free;
+  };
+  const dist = (x, free) => Math.min(...free.map(([a, b]) => (x < a ? a - x : x > b ? x - b : 0)));
+
+  for (let seed = 0; seed < 30; seed++) {
+    const rows = [];
+    for (let i = SAFE_CHUNKS; i < 90; i++) {
       const solids = generateChunk(seed, i).obstacles.filter((o) => o.solid);
-      for (const ob of solids) {
-        // everything in the same horizontal slice as this obstacle
-        const row = solids.filter((o) => Math.abs(o.y - ob.y) * 2 < o.h + ob.h);
-        const blocked = row.reduce((sum, o) => sum + o.w, 0);
-        assert.ok(DRIVE_HALF * 2 - blocked > truckW * 2, `seed ${seed} chunk ${i} blocked ${blocked}`);
+      if (!solids.length) continue;
+      assert.ok(solids.every((o) => o.y === solids[0].y), 'one row per chunk');
+      rows.push({ y: solids[0].y, free: freeIntervals(solids) });
+    }
+    for (let k = 0; k < rows.length; k++) {
+      assert.ok(rows[k].free.length > 0, `seed ${seed}: row fully blocked`);
+      if (k === 0) continue;
+      assert.ok(rows[k - 1].y - rows[k].y >= minRowGap, `seed ${seed}: rows too close`);
+      // from anywhere you can pass the previous row, a gap in this row is within reach
+      for (const [a, b] of rows[k - 1].free) {
+        for (let x = a; x <= b; x += 10) {
+          const need = dist(x, rows[k].free);
+          assert.ok(need <= maxSwerve, `seed ${seed}: needs a ${Math.round(need)} px swerve (max ${Math.round(maxSwerve)})`);
+        }
       }
     }
   }
+});
+
+test('repair kits restore armour up to the maximum', () => {
+  const save = defaultSave();
+  const w = new World({ save, seed: 4 });
+  w.truck.hp = 50;
+  w.pickups = [{ type: 'repair', amount: 30, x: w.truck.x, y: w.truck.y, w: 30, h: 30, t: 0, taken: false }];
+  w.update(1 / 60, fakeInput());
+  assert.equal(w.truck.hp, 80);
+  w.pickups = [{ type: 'repair', amount: 30, x: w.truck.x, y: w.truck.y, w: 30, h: 30, t: 0, taken: false }];
+  w.update(1 / 60, fakeInput());
+  assert.equal(w.truck.hp, w.truck.stats.maxHp);
+});
+
+test('steering ramps in smoothly instead of snapping', () => {
+  const w = new World({ save: defaultSave(), seed: 4 });
+  const right = fakeInput(['gas', 'right']);
+  w.update(1 / 60, right);
+  const early = w.truck.vx;
+  for (let i = 0; i < 60; i++) w.update(1 / 60, right);
+  assert.ok(early > 0 && early < w.truck.vx * 0.1, `first-frame lateral speed ${early} vs ${w.truck.vx}`);
 });
 
 test('blockers stay near the asphalt, pickups within drivable area', () => {

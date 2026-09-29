@@ -46,7 +46,7 @@ export class World {
 
     this.startInv = { ...save.inventory };
     this.inv = { ...save.inventory };
-    this.gained = { scrap: 0, food: 0, dogFood: 0, fuel: 0, ammo: 0 };
+    this.gained = { scrap: 0, food: 0, dogFood: 0, fuel: 0, ammo: 0, repair: 0 };
     this.kills = 0;
     this.fuelPicked = 0; // canisters found (objective)
 
@@ -177,6 +177,7 @@ export class World {
     this.warnOnce('hunger', this.satiety < 25, 'Водитель голоден — [E] поесть', '#9fdc6a');
     this.warnOnce('dog', this.dogSatiety < 25, 'Собака голодна — [Q] покормить', '#f0a24a');
     this.warnOnce('fuel', isFuelLow(this.truck), 'Мало топлива!', '#ffcf4a');
+    this.warnOnce('armor', this.truck.hp < this.truck.stats.maxHp * 0.35, 'Броня на исходе — ищи ремкомплекты', '#ff8a75');
   }
 
   warnOnce(key, cond, text, color) {
@@ -334,6 +335,8 @@ export class World {
     const tb = truck.box;
     for (const ob of this.obstacles) {
       if (!ob.solid) continue;
+      // collapses are round holes: only the ellipse inside the hitbox hurts
+      if (ob.kind === 'collapse' && !rectHitsEllipse(tb, ob)) continue;
       const pen = aabbPenetration(truck.box, ob);
       if (!pen) continue;
       if (pen.y <= pen.x) {
@@ -374,7 +377,12 @@ export class World {
       if (p.taken || !aabbOverlap(p, tb)) continue;
       p.taken = true;
       const name = PICKUPS[p.type].name;
-      if (p.type === 'fuel') {
+      if (p.type === 'repair') {
+        const before = this.truck.hp;
+        this.truck.hp = Math.min(this.truck.stats.maxHp, this.truck.hp + p.amount);
+        this.toast(`Ремонт: +${Math.round(this.truck.hp - before)} брони`, '#7fe07a');
+        this.particles.emit(this.truck.x, this.truck.y, { count: 14, colors: ['#7fe07a', '#d8f5c0'], speed: 70, life: 0.6 });
+      } else if (p.type === 'fuel') {
         this.truck.fuel = Math.min(this.truck.stats.maxFuel, this.truck.fuel + p.amount);
         this.fuelPicked++;
         this.toast(`+${p.amount} ${name}`, '#ffcf4a');
@@ -438,4 +446,13 @@ export class World {
 
 function isFuelLow(truck) {
   return truck.fuel < truck.stats.maxFuel * 0.2;
+}
+
+/** Does the centre-based rect touch the ellipse inscribed in box `e`? */
+function rectHitsEllipse(r, e) {
+  const nx = clamp(e.x, r.x - r.w / 2, r.x + r.w / 2);
+  const ny = clamp(e.y, r.y - r.h / 2, r.y + r.h / 2);
+  const dx = (nx - e.x) / (e.w / 2);
+  const dy = (ny - e.y) / (e.h / 2);
+  return dx * dx + dy * dy < 1;
 }
