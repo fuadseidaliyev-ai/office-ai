@@ -6,7 +6,7 @@
 //  * everything else is a sprite placed and scaled by its distance, drawn far → near.
 // The simulation is untouched; only drawing differs.
 
-import { BUFFER_W, BUFFER_H, CHUNK_H, DOG_GUN, OBSTACLE_ART_SCALE, PERSP, PICKUPS, VIEW_H } from './config.js';
+import { BUFFER_W, BUFFER_H, CHUNK_H, DOG_GUN, OBSTACLE_ART_SCALE, PERSP, PICKUPS, VIEW_H, zombieType } from './config.js';
 import { art } from './art.js';
 import { bushSprite, pickupSprite, radioTowerSprite, vignette } from './sprites.js';
 import { drawGround, hazardImage, isFlashing } from './view.js';
@@ -282,11 +282,12 @@ function drawPickup(ctx, cam, world, pk) {
 }
 
 function drawZombie(ctx, cam, z) {
-  const img = art[z.art];
+  const def = zombieType(z);
+  const img = art[`${def.art}${z.facing || 'Down'}`];
   if (!img) return;
-  flatShadow(ctx, cam, z.x, z.y + 40, 26, 10);
+  flatShadow(ctx, cam, z.x, z.y + def.h / 2, def.w * 0.6, 10);
   const bob = Math.abs(Math.sin(z.t * 5)) * 4;
-  drawUpright(ctx, cam, img, z.x, z.y + 40, { flip: z.face < 0, rot: Math.sin(z.t * 2.5) * 0.05, lift: bob });
+  drawUpright(ctx, cam, img, z.x, z.y + def.h / 2, { rot: Math.sin(z.t * 2.5) * 0.05, lift: bob });
 }
 
 function drawTruck(ctx, cam, world) {

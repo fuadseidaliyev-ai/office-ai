@@ -329,8 +329,96 @@ def gunner():
     print(f'truckGun {img.size}  dogGunner {tur.shape[1]}x{tur.shape[0]}  pivot offset {px - cx:.1f},{py - cy:.1f}')
 
 
+# Zombie types (tools/zombies/typeN.png): per-direction views -> assets/z{N}{dir}.png.
+# box = (x0, y0, x1, y1) in the reference; `mirror` builds a view from another one's art
+# (the references draw some side views facing the wrong way). height = in-game px.
+ZOMBIE_TYPES = {
+    1: {'height': 100, 'views': {
+        'down': (648, 110, 764, 330), 'up': (800, 105, 910, 330),
+        'right': (1088, 115, 1225, 330), 'left': ('mirror', 'right')}},
+    2: {'height': 100, 'views': {
+        'up': (30, 885, 162, 1115), 'upRight': (200, 885, 340, 1115), 'right': (355, 900, 505, 1080),
+        'downRight': (540, 900, 692, 1115), 'down': (722, 900, 852, 1080), 'downLeft': (892, 900, 1042, 1115),
+        'left': (1058, 885, 1218, 1105), 'upLeft': ('mirror', 'upRight')}},
+    3: {'height': 128, 'views': {
+        'down': (70, 450, 322, 775), 'up': (660, 440, 892, 785), 'left': (970, 450, 1135, 775),
+        'right': ('mirror', 'left')}},
+}
+
+
+def zombies():
+    import cv2
+    from rembg import new_session, remove
+    s = new_session('birefnet-general-lite')
+    for n, spec in ZOMBIE_TYPES.items():
+        ref = Image.open(Path(__file__).parent / 'zombies' / f'type{n}.png').convert('RGB')
+        cut = {}
+        for d, box in spec['views'].items():
+            if box[0] == 'mirror':
+                continue
+            out = np.array(remove(ref.crop(box), session=s))
+            a = out[..., 3] >= 140
+            # drop the cast shadow / road bits: keep the biggest blob
+            k, lab, stats, _ = cv2.connectedComponentsWithStats(a.astype(np.uint8), 8)
+            if k > 1:
+                a = lab == 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
+            out[..., 3] = np.where(a, 255, 0)
+            img = Image.fromarray(out, 'RGBA')
+            cut[d] = img.crop(img.getbbox())
+        for d, box in spec['views'].items():
+            if box[0] == 'mirror':
+                cut[d] = cut[box[1]].transpose(Image.FLIP_LEFT_RIGHT)
+        # one scale per type (tallest view -> height), so all views match
+        k = spec['height'] / max(im.height for im in cut.values())
+        for d, im in cut.items():
+            im = im.resize((max(1, round(im.width * k)), max(1, round(im.height * k))), Image.LANCZOS)
+            a = np.array(im)
+            a[..., 3] = np.where(a[..., 3] >= 128, 255, 0)
+            Image.fromarray(a, 'RGBA').save(OUT / f'z{n}{d[0].upper()}{d[1:]}.png')
+            print(f'z{n}{d}', im.size)
+    del s
+
+
+# On-screen control buttons (tools/buttons/buttons.png) -> assets/btn{Name}.png.
+BUTTONS = {'Left': (38, 400, 372, 752), 'Right': (388, 400, 722, 752),
+           'Brake': (755, 282, 1048, 860), 'Gas': (1085, 168, 1415, 872)}
+
+
+def buttons():
+    import cv2
+    ref = np.array(Image.open(Path(__file__).parent / 'buttons' / 'buttons.png').convert('RGB'))
+    for name, (x0, y0, x1, y1) in BUTTONS.items():
+        pad = 12
+        crop = ref[y0 - pad:y1 + pad, x0 - pad:x1 + pad]
+        # the metal frame is brighter than the dark rusty plate behind it: the button is
+        # the convex hull of the big bright blobs (the panel inside is as dark as the
+        # plate), plus the small side ribs of the pedals
+        bright = (crop.astype(np.int32).max(axis=2) > 34).astype(np.uint8)
+        bright = cv2.morphologyEx(bright, cv2.MORPH_OPEN, np.ones((7, 7), np.uint8))
+        bright = cv2.morphologyEx(bright, cv2.MORPH_CLOSE, np.ones((9, 9), np.uint8))
+        k, lab, stats, _ = cv2.connectedComponentsWithStats(bright, 8)
+        big = [i for i in range(1, k) if stats[i, cv2.CC_STAT_AREA] > 0.01 * bright.size]
+        ribs = [i for i in range(1, k) if stats[i, cv2.CC_STAT_AREA] > 0.0005 * bright.size]
+        pts = np.column_stack(np.nonzero(np.isin(lab, big))[::-1]).astype(np.int32)
+        hull = np.zeros_like(bright)
+        cv2.fillConvexPoly(hull, cv2.convexHull(pts), 1)
+        mask = (hull > 0) | np.isin(lab, ribs)
+        out = np.dstack([crop, np.where(mask, 255, 0).astype(np.uint8)])
+        img = Image.fromarray(out, 'RGBA')
+        img = img.crop(img.getbbox())
+        img = img.resize((img.width * 3 // 5, img.height * 3 // 5), Image.LANCZOS)
+        img.save(OUT / f'btn{name}.png')
+        print(f'btn{name}', img.size)
+
+
 if __name__ == '__main__':
     import sys
+    if '--buttons' in sys.argv:
+        buttons()
+        sys.exit()
+    if '--zombies' in sys.argv:
+        zombies()
+        sys.exit()
     if '--gunner' in sys.argv:
         gunner()
         sys.exit()

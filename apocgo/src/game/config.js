@@ -176,18 +176,31 @@ export const SPAWN = {
 };
 
 export const ZOMBIE = {
-  speed: [35, 70],
-  chaseSpeed: [75, 115],
   sight: 450,
   killSpeed: 150, // truck speed needed to run a zombie over (~15 km/h)
-  w: 44,
-  h: 80,
-  grabDrag: 120, // px/s² a clinging zombie slows the truck (zombies never cost armour)
+  grabDrag: 120, // px/s² a clinging zombie slows the truck
+};
+
+// Zombie kinds (art from tools/zombies/). `art` + a facing name = file in assets/
+// (z1Down, z2UpRight…); `dirs` = 4 or 8 facings. `hp` = dog bullets to kill;
+// `crash` = armour the truck loses running it over (only the heavy one hurts).
+export const ZOMBIE_TYPES = {
+  walker: { name: 'бродяга', art: 'z1', dirs: 4, weight: 5, hp: 1, crash: 0, w: 44, h: 80, speed: [35, 70], chaseSpeed: [75, 115] },
+  runner: { name: 'бегун', art: 'z2', dirs: 8, weight: 3, hp: 1, crash: 0, w: 44, h: 80, speed: [80, 120], chaseSpeed: [200, 250] },
+  heavy: { name: 'тяжёлый', art: 'z3', dirs: 4, weight: 2, hp: 5, crash: 6, w: 70, h: 100, speed: [25, 45], chaseSpeed: [55, 75] },
+};
+/** A zombie's kind definition (zombies without a `type` are walkers). */
+export function zombieType(z) {
+  return ZOMBIE_TYPES[z.type] || ZOMBIE_TYPES.walker;
+}
+
+export const ZOMBIE_FACINGS = {
+  4: ['Right', 'Down', 'Left', 'Up'],
+  8: ['Right', 'DownRight', 'Down', 'DownLeft', 'Left', 'UpLeft', 'Up', 'UpRight'],
 };
 
 // Art-backed variants (names of files in assets/).
 export const ART = {
-  zombies: ['zombie1', 'zombie2', 'zombie3', 'zombie4', 'zombie5', 'zombie6'],
   barrels: ['barrel1', 'barrel2', 'barrel3', 'barrel4', 'barrelLying1', 'barrelLying2'],
   tires: ['tire1', 'tire2'],
   cracks: ['cracks1', 'cracks2', 'cracks3', 'cracks4', 'cracks5'],

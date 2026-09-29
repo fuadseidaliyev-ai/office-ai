@@ -11,7 +11,7 @@
 import { RNG, hashSeed } from '../engine/rng.js';
 import { aabbOverlap, clamp } from '../engine/math.js';
 import {
-  ART, CHUNK_H, DECOR, DRIVE_HALF, OBSTACLES, OBSTACLE_ART_SCALE, PICKUPS, ROAD_HALF, SAFE_CHUNKS, SPAWN, ZOMBIE,
+  ART, CHUNK_H, DECOR, DRIVE_HALF, OBSTACLES, OBSTACLE_ART_SCALE, PICKUPS, ROAD_HALF, SAFE_CHUNKS, SPAWN, ZOMBIE_TYPES,
 } from './config.js';
 import { MASKS } from './masks.js';
 
@@ -100,16 +100,22 @@ export function generateChunk(seed, index) {
   }
 
   // 2. Zombies.
+  // all three kinds, mixed at random
+  const kinds = Object.fromEntries(Object.entries(ZOMBIE_TYPES).map(([k, v]) => [k, v.weight]));
   for (let i = rng.int(...SPAWN.zombies(d)); i > 0; i--) {
-    const p = place(rng, top, solids, ZOMBIE.w, ZOMBIE.h, DRIVE_HALF - 20);
+    const type = rng.weighted(kinds);
+    const def = ZOMBIE_TYPES[type];
+    const p = place(rng, top, solids, def.w, def.h, DRIVE_HALF - 20);
     if (!p) continue;
     out.zombies.push({
       ...p,
-      speed: rng.range(...ZOMBIE.speed),
-      chaseSpeed: rng.range(...ZOMBIE.chaseSpeed),
+      type,
+      hp: def.hp,
+      speed: rng.range(...def.speed),
+      chaseSpeed: rng.range(...def.chaseSpeed),
       dir: rng.range(0, Math.PI * 2),
       t: rng.range(0, 10),
-      art: rng.pick(ART.zombies),
+      facing: 'Down',
       dead: false,
     });
   }

@@ -8,7 +8,7 @@ import { aabbOverlap, aabbPenetration, clamp } from '../engine/math.js';
 import { RNG } from '../engine/rng.js';
 import {
   ART, BUFFER_W, PERSP, VIEW_W, VIEW_H, CHUNK_H, DRIVE_HALF, PIXEL, ROAD_HALF, PX_PER_METER, DOG_GUN, SURVIVAL,
-  ZOMBIE, PICKUPS, OBSTACLES, computeTruckStats, goalMeters,
+  ZOMBIE, ZOMBIE_FACINGS, PICKUPS, zombieType, OBSTACLES, computeTruckStats, goalMeters,
 } from './config.js';
 import { maskHit } from './collide.js';
 import { generateChunk } from './generator.js';
@@ -235,7 +235,7 @@ export class World {
         z.moving = true;
       }
       z.x = clamp(z.x, -DRIVE_HALF - 30, DRIVE_HALF + 30);
-      if (Math.abs(z.x - ox) > 0.01) z.face = z.x > ox ? 1 : -1;
+      z.facing = facingOf(z, z.x - ox, z.y - oy);
       // zombies don't walk through blockers
       for (const ob of this.obstacles) {
         if (ob.solid && maskHit(z, ob)) {
@@ -248,10 +248,16 @@ export class World {
 
       if (!aabbOverlap(z, tb)) continue;
       if (Math.abs(truck.speed) >= ZOMBIE.killSpeed) {
-        // armour is only lost in obstacle collisions — running zombies over just jolts
+        // running zombies over just jolts — only the heavy one dents the armour a bit
+        const def = zombieType(z);
         this.killZombie(z);
-        truck.speed *= 0.9;
-        this.camera.shake(2, 0.15);
+        truck.speed *= def.crash ? 0.8 : 0.9;
+        if (def.crash) {
+          truck.damage(def.crash * truck.stats.ram);
+          this.camera.shake(5, 0.25);
+        } else {
+          this.camera.shake(2, 0.15);
+        }
       } else {
         // grabbed onto the truck: they drag it down (no armour loss) until you speed up
         truck.speed = Math.max(0, truck.speed - ZOMBIE.grabDrag * dt);
@@ -352,6 +358,13 @@ export class World {
     this.particles.emit(ox + Math.cos(angle) * 40, oy + Math.sin(angle) * 40, {
       count: 8, colors: ['#fff2b0', '#ffd36b', '#ff9d3a'], speed: 120, angle, spread: 0.6, life: 0.2,
     });
+    // the heavy one takes several bullets
+    z.hp = (z.hp ?? zombieType(z).hp) - 1;
+    if (z.hp > 0) {
+      z.hitAt = this.time;
+      this.particles.emit(z.x, z.y, { count: 6, colors: ['#8b1e14', '#6b1a14'], speed: 70, angle, spread: 1.2, life: 0.35 });
+      return;
+    }
     this.killZombie(z, angle);
     this.dogKills++;
   }
@@ -489,4 +502,13 @@ export class World {
       keptScrap: inv.scrap - this.startInv.scrap,
     };
   }
+}
+
+/** Facing art name for a movement step (dx, dy): 4 or 8 directions depending on the kind. */
+function facingOf(z, dx, dy) {
+  if (Math.abs(dx) + Math.abs(dy) < 0.01) return z.facing;
+  const names = ZOMBIE_FACINGS[zombieType(z).dirs];
+  const n = names.length;
+  const i = Math.round((Math.atan2(dy, dx) / (Math.PI * 2)) * n);
+  return names[((i % n) + n) % n];
 }

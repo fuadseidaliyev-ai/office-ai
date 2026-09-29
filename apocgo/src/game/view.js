@@ -2,7 +2,7 @@
 // Layer order (bottom → top): ground, road, markings, decals, holes, pickups,
 // obstacles, zombies, truck, gunfire, particles, roadside decor, screen overlays.
 
-import { BUFFER_W, BUFFER_H, DOG_GUN, OBSTACLE_ART_SCALE, PICKUPS, PIXEL, ROAD_HALF } from './config.js';
+import { BUFFER_W, BUFFER_H, DOG_GUN, OBSTACLE_ART_SCALE, PICKUPS, PIXEL, ROAD_HALF, zombieType } from './config.js';
 import { art } from './art.js';
 import {
   bushSprite, paintSprite, pickupSprite, radioTowerSprite, tyreSprite, vignette,
@@ -124,7 +124,7 @@ export function drawWorld(ctx, world, { hideTruck = false, debug = false } = {})
 
   // zombies — sorted by y so lower ones overlap upper ones
   const zs = world.zombies.filter((z) => !z.dead).sort((a, b) => a.y - b.y);
-  for (const z of zs) drawZombie(ctx, z);
+  for (const z of zs) drawZombie(ctx, z, world);
 
   if (!hideTruck) drawTruck(ctx, world);
   drawGunfire(ctx, world);
@@ -307,11 +307,13 @@ function drawObstacle(ctx, ob, hazard) {
   drawArt(ctx, ob.art, ob.x, ob.y, { flip: ob.flip, scale, hazard });
 }
 
-function drawZombie(ctx, z) {
-  // single-frame art, animated with a shambling bob / sway
-  const bob = Math.abs(Math.sin(z.t * 5)) * 4;
-  shadow(ctx, z.x + 4, z.y + 44, 26, 8);
-  drawArt(ctx, z.art, z.x, z.y - bob, { flip: z.face < 0, rot: Math.sin(z.t * 2.5) * 0.06 });
+function drawZombie(ctx, z, world) {
+  // one frame per facing, animated with a shambling bob / sway (runners bob faster)
+  const def = zombieType(z);
+  const bob = Math.abs(Math.sin(z.t * (z.type === 'runner' ? 11 : 5))) * 4;
+  const hit = world.time - (z.hitAt ?? -99) < 0.12;
+  shadow(ctx, z.x + 4, z.y + def.h / 2 + 4, def.w * 0.6, 8);
+  drawArt(ctx, `${def.art}${z.facing || 'Down'}`, z.x, z.y - bob, { rot: Math.sin(z.t * 2.5) * 0.06, hazard: hit ? 'hit' : null });
 }
 
 function drawTruck(ctx, world) {

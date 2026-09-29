@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DRIVE_HALF, ROAD_HALF, SAFE_CHUNKS, UPGRADE_KEYS, computeTruckStats, upgradeCost } from '../src/game/config.js';
+import { DRIVE_HALF, ROAD_HALF, SAFE_CHUNKS, UPGRADE_KEYS, ZOMBIE_TYPES, computeTruckStats, upgradeCost } from '../src/game/config.js';
 import { generateChunk } from '../src/game/generator.js';
 import { defaultSave, normalizeSave } from '../src/game/save.js';
 import { Truck } from '../src/game/truck.js';
@@ -306,4 +306,43 @@ test('picked-up food raises the bar at once; standing still, steering only turns
   for (let i = 0; i < 120; i++) w.update(1 / 60, fakeInput(['right']));
   assert.equal(w.truck.x, x0);
   assert.ok(w.truck.steer > 0.9);
+});
+
+test('three zombie kinds: walkers and runners die from one bullet, the heavy one takes several and dents the truck', () => {
+  const w = new World({ save: defaultSave(), seed: 21 });
+  w.obstacles = [];
+  w.pickups = [];
+  const t = w.truck;
+  const zombie = (type, x, y) => ({ type, hp: ZOMBIE_TYPES[type].hp, x, y, w: 44, h: 80, speed: 0, chaseSpeed: 0, dir: 0, t: 0, dead: false });
+  for (const type of ['walker', 'runner']) {
+    const z = zombie(type, t.x, t.y - 400);
+    w.zombies = [z];
+    w.gunCooldown = 0;
+    for (let i = 0; i < 20 && !z.dead; i++) w.update(1 / 60, fakeInput());
+    assert.ok(z.dead, type);
+  }
+  // the heavy one survives the first bullets
+  const heavy = zombie('heavy', t.x, t.y - 450);
+  w.zombies = [heavy];
+  for (let i = 0; i < 60; i++) w.update(1 / 60, fakeInput());
+  assert.ok(!heavy.dead && heavy.hp < ZOMBIE_TYPES.heavy.hp);
+  for (let i = 0; i < 60 * 4 && !heavy.dead; i++) w.update(1 / 60, fakeInput());
+  assert.ok(heavy.dead);
+  // running over: walkers and runners cost nothing, the heavy one a little armour
+  for (const type of ['walker', 'runner', 'heavy']) {
+    const hp = t.hp;
+    t.speed = t.stats.maxSpeed;
+    w.dogSatiety = 0; // the dog would shoot it first
+    const z = zombie(type, t.x, t.y - 170);
+    w.zombies = [z];
+    w.update(1 / 60, fakeInput(['gas']));
+    assert.ok(z.dead, type);
+    if (type === 'heavy') assert.ok(t.hp < hp && t.hp > hp - 15, `${hp} -> ${t.hp}`);
+    else assert.equal(t.hp, hp);
+    t.invuln = 0;
+  }
+  // chunks spawn all three kinds
+  const kinds = new Set();
+  for (let i = SAFE_CHUNKS; i < 40; i++) for (const z of generateChunk(4, i).zombies) kinds.add(z.type);
+  assert.deepEqual([...kinds].sort(), ['heavy', 'runner', 'walker']);
 });

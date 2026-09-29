@@ -3,14 +3,16 @@
 // fingers on them into the same actions the keyboard produces.
 
 import { text } from '../engine/text.js';
+import { art } from './art.js';
 import { UI_W, UI_H } from './config.js';
 
 export function touchButtons() {
   return [
-    { action: 'left', label: '', icon: 'left', x: 6, y: UI_H - 60, w: 54, h: 54 },
-    { action: 'right', label: '', icon: 'right', x: 66, y: UI_H - 60, w: 54, h: 54 },
-    { action: 'gas', label: 'ГАЗ', icon: 'gas', x: UI_W - 62, y: UI_H - 92, w: 56, h: 86 },
-    { action: 'brake', label: 'ТОРМОЗ', icon: 'brake', x: UI_W - 122, y: UI_H - 60, w: 54, h: 54 },
+    // sizes follow the button art's proportions (assets/btn*.png)
+    { action: 'left', label: '', icon: 'left', art: 'btnLeft', x: 6, y: UI_H - 60, w: 52, h: 54 },
+    { action: 'right', label: '', icon: 'right', art: 'btnRight', x: 62, y: UI_H - 60, w: 52, h: 54 },
+    { action: 'gas', label: 'ГАЗ', icon: 'gas', art: 'btnGas', x: UI_W - 52, y: UI_H - 109, w: 46, h: 103 },
+    { action: 'brake', label: 'ТОРМОЗ', icon: 'brake', art: 'btnBrake', x: UI_W - 100, y: UI_H - 92, w: 44, h: 86 },
     { action: 'pause', label: '', icon: 'pause', x: UI_W / 2 - 14, y: 4, w: 28, h: 18 },
   ];
 }
@@ -33,6 +35,23 @@ const ACCENT = {
 export function drawTouchButtons(ui, buttons, input) {
   for (const b of buttons) {
     const held = input.isButtonHeld(b) || input.down(b.action);
+    const img = b.art && art[b.art];
+    if (img) {
+      // rusty metal buttons: pressed = pushed in a little and lit up
+      const k = held ? 0.94 : 1;
+      const w = b.w * k;
+      const h = b.h * k;
+      ui.save();
+      ui.globalAlpha = held ? 1 : 0.88;
+      ui.drawImage(img, b.x + (b.w - w) / 2, b.y + (b.h - h) / 2, w, h);
+      if (held) {
+        ui.globalCompositeOperation = 'lighter';
+        ui.globalAlpha = 0.18;
+        ui.drawImage(img, b.x + (b.w - w) / 2, b.y + (b.h - h) / 2, w, h);
+      }
+      ui.restore();
+      continue;
+    }
     const accent = ACCENT[b.action] || '#e9e4d8';
     ui.save();
     ui.globalAlpha = held ? 0.95 : 0.6;
