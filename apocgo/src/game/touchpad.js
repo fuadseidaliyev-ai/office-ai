@@ -4,22 +4,17 @@
 
 import { text } from '../engine/text.js';
 import { art } from './art.js';
-import { PORTRAIT, UI_W, UI_H } from './config.js';
+import { UI_W, UI_H } from './config.js';
 
 export function touchButtons() {
   return [
-    // sizes follow the button art's proportions (assets/btn*.png)
-    // steering sits higher than the pedals (easier for the thumb in portrait)
-    { action: 'left', label: '', icon: 'left', art: 'btnLeft', x: 6, y: UI_H - steerLift() - 60, w: 52, h: 54 },
-    { action: 'right', label: '', icon: 'right', art: 'btnRight', x: 62, y: UI_H - steerLift() - 60, w: 52, h: 54 },
+    // one row along the bottom, all as tall as the gas pedal (art is 169-183 x 409 px)
+    { action: 'left', label: '', icon: 'left', art: 'btnLeft', x: 6, y: UI_H - 109, w: 43, h: 103 },
+    { action: 'right', label: '', icon: 'right', art: 'btnRight', x: 55, y: UI_H - 109, w: 43, h: 103 },
+    { action: 'brake', label: 'ТОРМОЗ', icon: 'brake', art: 'btnBrake', x: UI_W - 101, y: UI_H - 109, w: 43, h: 103 },
     { action: 'gas', label: 'ГАЗ', icon: 'gas', art: 'btnGas', x: UI_W - 52, y: UI_H - 109, w: 46, h: 103 },
-    { action: 'brake', label: 'ТОРМОЗ', icon: 'brake', art: 'btnBrake', x: UI_W - 100, y: UI_H - 92, w: 44, h: 86 },
     { action: 'pause', label: '', icon: 'pause', x: UI_W / 2 - 14, y: 4, w: 28, h: 18 },
   ];
-}
-
-function steerLift() {
-  return PORTRAIT ? 64 : 30;
 }
 
 /** Is this a touch-first device (phone / tablet)? */

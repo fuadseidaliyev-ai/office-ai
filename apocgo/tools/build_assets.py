@@ -387,6 +387,7 @@ BUTTONS = {'Left': (38, 400, 372, 752), 'Right': (388, 400, 722, 752),
 def buttons():
     import cv2
     ref = np.array(Image.open(Path(__file__).parent / 'buttons' / 'buttons.png').convert('RGB'))
+    cut = {}
     for name, (x0, y0, x1, y1) in BUTTONS.items():
         pad = 12
         crop = ref[y0 - pad:y1 + pad, x0 - pad:x1 + pad]
@@ -407,8 +408,67 @@ def buttons():
         img = Image.fromarray(out, 'RGBA')
         img = img.crop(img.getbbox())
         img = img.resize((img.width * 3 // 5, img.height * 3 // 5), Image.LANCZOS)
+        cut[name] = img
+    # steering buttons: the tall brake frame, emptied, with the arrow from the square art
+    # (the square buttons' panel has chamfered corners, so it can't be stretched itself)
+    brake = cut['Brake']
+    blank = tile_rows(brake, (70, 115), 285 - 70)
+    blank = Image.fromarray(np.vstack([np.array(brake)[:70], np.array(blank), np.array(brake)[285:]]), 'RGBA')
+    for name in ('Left', 'Right'):
+        arrow = cut[name].crop(ARROW_BOX)
+        a = np.array(arrow).astype(np.float32)
+        a[..., 3] *= ellipse_fade(a.shape[0], a.shape[1], 0.3)
+        arrow = Image.fromarray(a.astype(np.uint8), 'RGBA')
+        tall = stretch_tall(blank, BUTTON_BANDS['Brake'], BUTTON_HEIGHT)
+        tall.alpha_composite(arrow, ((tall.width - arrow.width) // 2, (tall.height - arrow.height) // 2))
+        cut[name] = tall
+    cut['Brake'] = stretch_tall(brake, BUTTON_BANDS['Brake'], BUTTON_HEIGHT)
+    for name, img in cut.items():
         img.save(OUT / f'btn{name}.png')
         print(f'btn{name}', img.size)
+
+
+def tile_rows(img, band, height):
+    """`height` rows made of the `band` rows of img, repeated mirrored (no seams)."""
+    src = np.array(img)[band[0]:band[1]]
+    rows, flip = [], True
+    while sum(r.shape[0] for r in rows) < height:
+        rows.append(src[::-1] if flip else src)
+        flip = not flip
+    return Image.fromarray(np.vstack(rows)[:height], 'RGBA')
+
+
+# All buttons are made as tall as the gas pedal: plain panel bands (rows of the button,
+# away from icons and bolts) are repeated, mirrored, to fill the extra height.
+BUTTON_HEIGHT = 409
+BUTTON_BANDS = {'Brake': [(70, 115)]}
+ARROW_BOX = (28, 40, 164, 162)  # the arrow and some dark panel around it, in the square art
+
+
+def stretch_tall(img, bands, height):
+    if not bands or img.height >= height:
+        return img
+    extra = height - img.height
+    parts, y = [], 0
+    for i, (b0, b1) in enumerate(bands):
+        add = extra // len(bands) + (extra % len(bands) if i == 0 else 0)
+        parts.append(img.crop((0, y, img.width, b1)))
+        band = img.crop((0, b0, img.width, b1))
+        flip = True
+        while add > 0:
+            piece = band.transpose(Image.FLIP_TOP_BOTTOM) if flip else band
+            piece = piece.crop((0, 0, img.width, min(add, piece.height)))
+            parts.append(piece)
+            add -= piece.height
+            flip = not flip
+        y = b1
+    parts.append(img.crop((0, y, img.width, img.height)))
+    out = Image.new('RGBA', (img.width, sum(p.height for p in parts)))
+    y = 0
+    for part in parts:
+        out.paste(part, (0, y))
+        y += part.height
+    return out
 
 
 if __name__ == '__main__':
