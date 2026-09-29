@@ -145,7 +145,6 @@ test('headless run: truck drives forward, hunger ticks, eating works', () => {
   for (let i = 0; i < 60 * 3; i++) w.update(1 / 60, gas);
   assert.ok(w.distance > 10, `distance ${w.distance}`);
   assert.ok(w.satiety < 100);
-  assert.ok(w.truck.fuel < w.truck.stats.maxFuel);
 
   const food = w.inv.food;
   w.satiety = 10;

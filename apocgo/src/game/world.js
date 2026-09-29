@@ -41,10 +41,9 @@ export class World {
 
     this.startInv = { ...save.inventory };
     this.inv = { ...save.inventory };
-    this.gained = { scrap: 0, food: 0, dogFood: 0, fuel: 0 };
+    this.gained = { scrap: 0, food: 0, dogFood: 0 };
     this.repaired = 0; // armour restored by parts this run
     this.kills = 0;
-    this.fuelPicked = 0; // canisters found (objective)
 
     // the dog's shotgun (unlimited shells, fires on its own while the dog is fed)
     this.gunCooldown = 0;
@@ -55,7 +54,6 @@ export class World {
 
     this.satiety = 100;
     this.dogSatiety = 100;
-    this.stall = 0;
 
     this.state = 'running'; // 'running' | 'won' | 'lost'
     this.reason = '';
@@ -172,7 +170,6 @@ export class World {
 
     this.warnOnce('hunger', this.satiety <= 0, 'Водитель голоден — машина едет медленнее. Ищи еду!', '#9fdc6a');
     this.warnOnce('dog', this.dogSatiety <= 0, 'Собака голодна и не стреляет. Ищи корм!', '#f0a24a');
-    this.warnOnce('fuel', isFuelLow(this.truck), 'Мало топлива!', '#ffcf4a');
     this.warnOnce('armor', this.truck.hp < this.truck.stats.maxHp * 0.35, 'Машина разбита на треть — собирай детали', '#ff8a75');
   }
 
@@ -377,10 +374,6 @@ export class World {
       const name = PICKUPS[p.type].name;
       if (p.type === 'scrap') {
         this.useParts(p.amount);
-      } else if (p.type === 'fuel') {
-        this.truck.fuel = Math.min(this.truck.stats.maxFuel, this.truck.fuel + p.amount);
-        this.fuelPicked++;
-        this.toast(`+${p.amount} ${name}`, '#ffcf4a');
       } else {
         this.inv[p.type] += p.amount;
         const colors = { food: '#9fdc6a', dogFood: '#f0a24a' };
@@ -418,8 +411,6 @@ export class World {
     const t = this.truck;
     if (t.y <= this.goalY) return this.end('won', 'Вы добрались до радиовышки!');
     if (t.hp <= 0) return this.end('lost', 'Машина разбита');
-    this.stall = t.fuel <= 0 && Math.abs(t.speed) < 15 ? this.stall + dt : 0;
-    if (this.stall > SURVIVAL.noFuelLimit) return this.end('lost', 'Кончилось топливо');
   }
 
   end(state, reason) {
@@ -456,9 +447,6 @@ export class World {
   }
 }
 
-function isFuelLow(truck) {
-  return truck.fuel < truck.stats.maxFuel * 0.2;
-}
 
 /** Normalise an angle to (−π, π]. */
 function wrapAngle(a) {

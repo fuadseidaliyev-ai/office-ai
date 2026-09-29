@@ -14,7 +14,6 @@ export class Truck {
     this.vx = 0;
     this.tilt = 0;
     this.hp = stats.maxHp;
-    this.fuel = stats.maxFuel;
     this.invuln = 0; // brief invulnerability after a heavy hit
     this.slow = 0; // seconds of pothole slowdown
     this.throttle = 0;
@@ -34,7 +33,7 @@ export class Truck {
 
   update(dt, input) {
     const s = this.stats;
-    this.throttle = input.down('gas') && this.fuel > 0 ? 1 : 0;
+    this.throttle = input.down('gas') ? 1 : 0;
     this.braking = input.down('brake');
     // The wheel turns gradually instead of snapping: it ramps toward the input, and
     // returns to centre a bit faster than it turns in.
@@ -70,10 +69,6 @@ export class Truck {
     // body heading follows the actual direction of travel, smoothed
     const heading = Math.atan2(this.vx, Math.max(Math.abs(this.speed), 180)) * 0.9;
     this.tilt += (heading - this.tilt) * damp(6, dt);
-
-    // Fuel.
-    const load = this.throttle * clamp(this.speed / s.maxSpeed, 0.3, 1);
-    this.fuel = Math.max(0, this.fuel - (SURVIVAL.fuelIdle + SURVIVAL.fuelThrottle * load) * dt);
   }
 
   damage(amount) {

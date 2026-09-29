@@ -77,7 +77,7 @@ export class GarageScene {
 
     const s = computeTruckStats(save.upgrades);
     const statsY = 214;
-    text(ui, `Скорость ${s.maxSpeed}  Разгон ${s.accel}  Руль ${s.handling}  Броня ${s.maxHp}  Бак ${s.maxFuel}  Таран ×${s.ram.toFixed(2)}`, 16, statsY, { size: 9, color: '#b8ab8c' });
+    text(ui, `Скорость ${s.maxSpeed}  Разгон ${s.accel}  Руль ${s.handling}  Броня ${s.maxHp}  Таран ×${s.ram.toFixed(2)}`, 16, statsY, { size: 9, color: '#b8ab8c' });
     text(ui, `Следующий рейс: этап ${save.level + 1}, радиовышка через ${goalMeters(save.level)} м`, 16, statsY + 14, { size: 10 });
     text(ui, '[Enter] В путь    [Esc] Меню    (на телефоне: тап по строке — купить, тап вне — в путь)', 16, UI_H - 18, { size: 9, color: '#d8c9a3' });
     if (this.msgT > 0) text(ui, this.msg, 390, 230, { size: 12, align: 'center', color: '#ffcf4a' });

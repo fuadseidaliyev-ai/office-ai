@@ -83,13 +83,7 @@ export function pickupSprite(type) {
         px('#b8322a', x, 1, 2, 5);
         px('#d8b25a', x, 6, 2, 2);
       }
-    } else if (type === 'fuel') {
-      px('#2f4220', 1, 1, 8, 9);
-      px('#4f7a2a', 2, 2, 6, 7);
-      px('#6c9a3c', 2, 2, 2, 7);
-      px('#2f4220', 3, 0, 4, 2);
-      px('#d6c24a', 7, 0, 2, 1);
-      px('#2f4220', 3, 5, 4, 1);
+
     }
   }));
 }

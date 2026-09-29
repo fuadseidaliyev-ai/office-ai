@@ -47,7 +47,6 @@ export const TRUCK_BASE = {
   handling: 460, // lateral px/s at full steer
   offroad: 0.55, // max-speed multiplier on the shoulders
   maxHp: 100,
-  maxFuel: 100,
   ram: 1, // collision damage multiplier (the ram upgrade lowers it)
 };
 
@@ -87,14 +86,6 @@ export const UPGRADES = {
       s.ram *= 1 - 0.18 * lvl;
     },
   },
-  tank: {
-    name: 'Бак',
-    desc: '+запас топлива',
-    costs: [10, 25, 45, 80],
-    apply: (s, lvl) => {
-      s.maxFuel += 25 * lvl;
-    },
-  },
 };
 
 export const UPGRADE_KEYS = Object.keys(UPGRADES);
@@ -118,20 +109,16 @@ export const SURVIVAL = {
   autoEatBelow: 20, // driver / dog eat from the stock by themselves below this satiety
   hungrySpeed: 0.6, // top-speed multiplier while the driver is starving
   partRepair: 8, // armour restored by one car part
-  fuelIdle: 0.25, // fuel/s while the engine runs
-  fuelThrottle: 0.95, // extra fuel/s at full throttle & top speed
-  noFuelLimit: 4, // seconds stalled with an empty tank before the run ends
 };
 
-// Pickups: the three core resources + fuel. `art` = image in assets/, `size` = drawn width.
+// Pickups: the three core resources. `art` = image in assets/, `size` = drawn width.
 //  scrap   — car parts: repair the truck on the spot, the rest goes to the garage
 //  food    — the driver's food: starving makes the truck slow
 //  dogFood — the dog's food: a hungry dog stops shooting
 export const PICKUPS = {
   scrap: { name: 'детали', min: 2, max: 5, art: 'pickScrap', size: 135 },
   food: { name: 'еда', min: 1, max: 1, art: 'pickFood', size: 105 },
-  dogFood: { name: 'корм', min: 1, max: 1, art: 'pickDogFood', size: 92 },
-  fuel: { name: 'топливо', min: 25, max: 35 },
+  dogFood: { name: 'корм', min: 1, max: 1, art: 'pickDogFood', size: 138 },
 };
 
 // The dog rides in the bed with a shotgun: unlimited shells, shoots zombies on its own
@@ -152,7 +139,7 @@ export const SPAWN = {
   rowChance: (d) => 0.85 + d * 0.15, // chance an even chunk has an obstacle row
   followChance: (d) => d * 0.45, // chance an odd chunk repeats the previous row's lane
   rowJitter: 80, // rows sit at chunk middle ± this
-  pickupChance: { scrap: 0.3, food: 0.12, dogFood: 0.12, fuel: 0.1 },
+  pickupChance: { scrap: 0.3, food: 0.12, dogFood: 0.12 },
   graffitiChance: 0.15,
 };
 

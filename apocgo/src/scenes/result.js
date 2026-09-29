@@ -32,7 +32,6 @@ export class ResultScene {
       ['Найдено деталей', r.gained.scrap],
       [r.won ? 'Деталей в запас' : 'Деталей в запас (½)', r.keptScrap],
       ['Еда / корм найдено', `${r.gained.food} / ${r.gained.dogFood}`],
-      ['Топливо подобрано', r.gained.fuel],
     ];
     rows.forEach(([k, v], i) => {
       text(ui, k, cx - 120, 96 + i * 16, { size: 11, color: '#b8ab8c' });

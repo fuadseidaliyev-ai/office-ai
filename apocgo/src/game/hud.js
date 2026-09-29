@@ -15,7 +15,7 @@ const INK = '#e9e4d8';
  */
 export function hudLayout(touch) {
   return {
-    vitalsY: touch ? 56 : UI_H - 48,
+    vitalsY: touch ? 56 : UI_H - 38,
     weaponY: touch ? 68 : UI_H - 30,
     toastY: touch ? 28 : 14,
   };
@@ -24,7 +24,7 @@ export function hudLayout(touch) {
 /** Rects of the tappable food / dog-food rows (UI coords). */
 export function vitalsRows(touch) {
   const { vitalsY } = hudLayout(touch);
-  return { food: [4, vitalsY + 22, 92, 10], dogFood: [4, vitalsY + 32, 92, 10] };
+  return { food: [4, vitalsY + 12, 92, 10], dogFood: [4, vitalsY + 22, 92, 10] };
 }
 
 export function drawHud(ui, world, { fps = 0, debug = false, touch = false } = {}) {
@@ -48,7 +48,6 @@ export function drawHud(ui, world, { fps = 0, debug = false, touch = false } = {
   const warn = [];
   if (world.satiety <= 0) warn.push('ВОДИТЕЛЬ ГОЛОДЕН · СКОРОСТЬ СНИЖЕНА');
   if (world.dogSatiety <= 0) warn.push('СОБАКА ГОЛОДНА · НЕ СТРЕЛЯЕТ');
-  if (world.stall > 0) warn.push('НЕТ ТОПЛИВА');
   if (warn.length && blink) {
     warn.forEach((w, i) => text(ui, w, UI_W / 2, UI_H / 2 - 40 + i * 13, { size: 12, align: 'center', color: '#ff5a45', bold: true }));
   }
@@ -81,10 +80,9 @@ function roundRect(ui, x, y, w, h, r) {
 // ------------------------------------------------------------ objectives (top-left)
 
 function drawObjectives(ui, world) {
-  const fuelFound = Math.min(2, world.fuelPicked);
   const rows = [
     ['Доехать до радиовышки', world.state === 'won'],
-    [`Найти топливо (${fuelFound}/2)`, fuelFound >= 2],
+    [`Собрать детали (${Math.min(10, world.gained.scrap)}/10)`, world.gained.scrap >= 10],
     ['Не разбить машину', world.state === 'won', world.truck.hp < world.truck.stats.maxHp * 0.35],
   ];
   panel(ui, 4, 4, 92, 38);
@@ -160,10 +158,9 @@ function drawCompass(ui, world) {
 function drawVitals(ui, world, blink, y) {
   const t = world.truck;
   const x = 4;
-  panel(ui, x, y, 92, 44);
+  panel(ui, x, y, 92, 34);
   const rows = [
     [iconCross, '#c8433a', t.hp / t.stats.maxHp],
-    [iconBolt, '#3f7fc4', t.fuel / t.stats.maxFuel],
     [iconFork, '#4f9a45', world.satiety / 100, world.inv.food, 'E'],
     [iconPaw, '#d9822b', world.dogSatiety / 100, world.inv.dogFood, 'Q'],
   ];
@@ -189,19 +186,6 @@ function iconCross(ui, x, y, c) {
   ui.fillStyle = c;
   ui.fillRect(x - 1.2, y - 3.5, 2.4, 7);
   ui.fillRect(x - 3.5, y - 1.2, 7, 2.4);
-}
-
-function iconBolt(ui, x, y) {
-  ui.fillStyle = '#d8d2c2';
-  ui.beginPath();
-  ui.moveTo(x + 1, y - 4);
-  ui.lineTo(x - 2.5, y + 0.5);
-  ui.lineTo(x - 0.2, y + 0.5);
-  ui.lineTo(x - 1, y + 4);
-  ui.lineTo(x + 2.5, y - 0.8);
-  ui.lineTo(x + 0.2, y - 0.8);
-  ui.closePath();
-  ui.fill();
 }
 
 function iconFork(ui, x, y) {
