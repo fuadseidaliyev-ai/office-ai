@@ -126,12 +126,12 @@ export class World {
   updateSkids(dt) {
     const t = this.truck;
     for (const s of this.skids) s.age += dt;
-    const turning = Math.abs(t.tilt) > 0.3 && Math.abs(t.speed) > 200;
+    const turning = Math.abs(t.tilt) > 0.22 && Math.abs(t.speed) > 200;
     const sn = Math.sin(t.tilt);
     const cs = Math.cos(t.tilt);
     const wheels = [-62, 62].map((lx) => ({ x: t.x + lx * cs - 118 * sn, y: t.y + lx * sn + 118 * cs }));
     if (turning && this._lastWheels) {
-      const strength = Math.min(1, (Math.abs(t.tilt) - 0.3) / 0.35);
+      const strength = Math.min(1, (Math.abs(t.tilt) - 0.22) / 0.3);
       wheels.forEach((w, i) => {
         const p = this._lastWheels[i];
         this.skids.push({ x1: p.x, y1: p.y, x2: w.x, y2: w.y, age: 0, a: 0.35 + strength * 0.35 });

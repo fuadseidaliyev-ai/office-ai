@@ -3,6 +3,8 @@ import { DRIVE_HALF, ROAD_HALF, SURVIVAL } from './config.js';
 
 // The player's pickup truck (with the dog in the bed). Arcade model: forward speed
 // along −y plus a lateral velocity from steering.
+const MAX_YAW = (30 * Math.PI) / 180; // body turn limit
+
 export class Truck {
   constructor(stats) {
     this.stats = stats;
@@ -66,9 +68,9 @@ export class Truck {
       this.vx = 0;
     }
 
-    // The body swings noticeably into the turn (up to ~47° at full speed), following
+    // The body swings into the turn (up to 30° at full speed), following
     // the direction it actually moves in, so it straightens out again against a wall.
-    const heading = clamp(Math.atan2(this.vx, Math.max(Math.abs(this.speed) * 0.6, 160)), -0.85, 0.85);
+    const heading = clamp(Math.atan2(this.vx, Math.max(Math.abs(this.speed) * 0.6, 160)), -MAX_YAW, MAX_YAW);
     this.tilt += (heading - this.tilt) * damp(7, dt);
   }
 
