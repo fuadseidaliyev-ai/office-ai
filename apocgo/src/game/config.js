@@ -142,7 +142,7 @@ export const SURVIVAL = {
 export const PICKUPS = {
   scrap: { name: 'детали', min: 2, max: 5, art: 'pickScrap', size: 135 },
   food: { name: 'еда', min: 1, max: 1, art: 'pickFood', size: 105 },
-  dogFood: { name: 'корм', min: 1, max: 1, art: 'pickDogFood', size: 138 },
+  dogFood: { name: 'корм', min: 1, max: 1, art: 'pickDogFood', size: 97 },
 };
 
 // The dog rides in the bed with a shotgun: unlimited shells, shoots zombies on its own

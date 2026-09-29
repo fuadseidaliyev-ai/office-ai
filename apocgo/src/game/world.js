@@ -411,12 +411,31 @@ export class World {
       if (p.type === 'scrap') {
         this.useParts(p.amount);
       } else {
-        this.inv[p.type] += p.amount;
-        const colors = { food: '#9fdc6a', dogFood: '#f0a24a' };
-        this.toast(`+${p.amount} ${name}`, colors[p.type]);
+        this.takeFood(p.type, p.amount);
       }
       this.gained[p.type] += p.amount;
       this.particles.emit(p.x, p.y, { count: 10, colors: ['#fff2b0', '#ffd36b'], speed: 50, life: 0.5 });
+    }
+  }
+
+  /**
+   * Food is eaten on the spot when the driver / dog isn't full, so the bar rises the
+   * moment it's picked up; otherwise it goes to the stock for later.
+   */
+  takeFood(type, amount) {
+    const key = type === 'food' ? 'satiety' : 'dogSatiety';
+    const who = type === 'food' ? 'Водитель поел' : 'Гав! Собака поела';
+    const color = type === 'food' ? '#9fdc6a' : '#f0a24a';
+    let left = amount;
+    if (this[key] < 100 && left > 0) {
+      const before = this[key];
+      this[key] = Math.min(100, this[key] + SURVIVAL.mealValue);
+      left--;
+      this.toast(`${who}: +${Math.round(this[key] - before)}`, color);
+    }
+    if (left > 0) {
+      this.inv[type] += left;
+      this.toast(`+${left} ${PICKUPS[type].name} в запас`, color);
     }
   }
 

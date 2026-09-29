@@ -279,3 +279,24 @@ test('the truck cannot leave the road and all resources lie on the road', () => 
     }
   }
 });
+
+test('picked-up food raises the bar at once; standing still, steering only turns the wheels', () => {
+  const w = new World({ save: defaultSave(), seed: 9 });
+  w.obstacles = [];
+  w.zombies = [];
+  w.satiety = 30;
+  w.dogSatiety = 30;
+  const food0 = w.inv.food;
+  const at = (type) => ({ type, amount: 1, x: w.truck.x, y: w.truck.y, w: 30, h: 30, t: 0, taken: false });
+  w.pickups = [at('food'), at('dogFood')];
+  w.update(1 / 60, fakeInput());
+  assert.ok(w.satiety > 70 && w.dogSatiety > 70, `${w.satiety} ${w.dogSatiety}`);
+  assert.equal(w.inv.food, food0); // eaten, not stored
+
+  w.pickups = [];
+  w.truck.speed = 0;
+  const x0 = w.truck.x;
+  for (let i = 0; i < 120; i++) w.update(1 / 60, fakeInput(['right']));
+  assert.equal(w.truck.x, x0);
+  assert.ok(w.truck.steer > 0.9);
+});

@@ -56,8 +56,9 @@ export class Truck {
     if (this.speed > max) this.speed = approach(this.speed, max, 550 * dt);
     this.speed = clamp(this.speed, -130, s.maxSpeed * 1.2);
 
-    // Lateral: steering authority grows with speed, never zero so you can wiggle free.
-    const authority = clamp(Math.abs(this.speed) / 200, 0.25, 1);
+    // Lateral: steering only moves the truck while it rolls (standing still, only the
+    // front wheels turn); authority grows with speed.
+    const authority = clamp(Math.abs(this.speed) / 200, 0, 1);
     const targetVx = steer * s.handling * authority;
     this.vx += (targetVx - this.vx) * damp(this.offroad ? 4.5 : 6, dt);
 
