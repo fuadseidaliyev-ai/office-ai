@@ -40,8 +40,8 @@ export function goalMeters(level) {
 
 // Base truck stats before upgrades.
 export const TRUCK_BASE = {
-  maxSpeed: 600, // px/s
-  accel: 340,
+  maxSpeed: 720, // px/s
+  accel: 408,
   brake: 700,
   drag: 130,
   handling: 460, // lateral px/s at full steer
@@ -58,8 +58,8 @@ export const UPGRADES = {
     desc: '+скорость и разгон',
     costs: [20, 40, 70, 110],
     apply: (s, lvl) => {
-      s.maxSpeed += 60 * lvl;
-      s.accel += 50 * lvl;
+      s.maxSpeed += 72 * lvl;
+      s.accel += 60 * lvl;
     },
   },
   armor: {
