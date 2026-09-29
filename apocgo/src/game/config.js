@@ -42,7 +42,7 @@ export const OBSTACLES = {
 
 // World layout. The truck drives "north" (−y).
 export const ROAD_HALF = 520; // asphalt from −520 to +520
-export const DRIVE_HALF = 680; // truck can go onto the shoulders up to here
+export const DRIVE_HALF = 440; // truck centre limit: the whole truck (150 wide) stays on the asphalt
 export const CHUNK_H = 900; // world is generated in horizontal strips of this height
 export const PX_PER_METER = 35;
 export const SAFE_CHUNKS = 2; // first chunks are obstacle-free
@@ -84,7 +84,7 @@ export const UPGRADES = {
   },
   tires: {
     name: 'Шины',
-    desc: '+управляемость и бездорожье',
+    desc: '+управляемость',
     costs: [15, 30, 55, 90],
     apply: (s, lvl) => {
       s.handling += 40 * lvl;

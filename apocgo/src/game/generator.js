@@ -114,11 +114,11 @@ export function generateChunk(seed, index) {
     });
   }
 
-  // 3. Pickups — half of them lure the player onto the slower shoulders.
+  // 3. Pickups (on the road only).
   for (const [type, chance] of Object.entries(SPAWN.pickupChance)) {
     if (!rng.chance(chance)) continue;
-    const onShoulder = rng.chance(0.5);
-    const p = place(rng, top, solids, 80, 80, onShoulder ? DRIVE_HALF - 30 : ROAD_HALF - 30, onShoulder ? ROAD_HALF + 40 : 0);
+    // resources lie only on the road, where the truck can reach them
+    const p = place(rng, top, solids, 80, 80, DRIVE_HALF - 30);
     if (!p) continue;
     const def = PICKUPS[type];
     const ob = { type, amount: rng.int(def.min, def.max), ...p, t: rng.range(0, 6), taken: false };
@@ -170,7 +170,7 @@ function addDecor(rng, top, out) {
       const half = DECOR[kind].w / 2;
       out.decor.push({
         kind,
-        x: side * (DRIVE_HALF + 40 + half + rng.range(0, 380)),
+        x: side * (ROAD_HALF + 40 + half + rng.range(0, 380)),
         y,
         side,
         // art is drawn for the left side; mirror it on the right unless it carries text

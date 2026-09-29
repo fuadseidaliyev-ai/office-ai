@@ -36,7 +36,7 @@ export class World {
     this.zombies = [];
     this.pickups = [];
     this.decals = [{ kind: 'finish', y: this.goalY }];
-    this.decor = [{ kind: 'tower', x: DRIVE_HALF + 180, y: this.goalY - 100 }];
+    this.decor = [{ kind: 'tower', x: ROAD_HALF + 420, y: this.goalY - 100 }];
     this.nextChunk = 0;
 
     this.startInv = { ...save.inventory };

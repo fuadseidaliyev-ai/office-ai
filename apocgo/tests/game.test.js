@@ -177,7 +177,10 @@ test('hunger never ends the run: a starving driver is slow, a hungry dog stops s
   w.inv.dogFood = 0;
   w.satiety = 0;
   w.dogSatiety = 0;
-  for (let i = 0; i < 60 * 30; i++) w.update(1 / 60, fakeInput(['gas']));
+  for (let i = 0; i < 60 * 30; i++) {
+    w.pickups = []; // no food on the way
+    w.update(1 / 60, fakeInput(['gas']));
+  }
   assert.equal(w.state, 'running');
   assert.ok(w.truck.speed <= w.truck.stats.maxSpeed * 0.6 + 1, `speed ${w.truck.speed}`);
   // a zombie right next to the truck is ignored by the hungry dog…
@@ -261,4 +264,18 @@ test('the dog turns the machine gun toward its target before firing', () => {
   // the muzzle sits at the end of the barrel in the aim direction
   const m = w.dogPos;
   assert.ok(m.x > w.dogPivot.x && m.y > w.dogPivot.y);
+});
+
+test('the truck cannot leave the road and all resources lie on the road', () => {
+  const w = new World({ save: defaultSave(), seed: 2 });
+  w.obstacles = [];
+  for (let i = 0; i < 60 * 4; i++) w.update(1 / 60, fakeInput(['gas', 'left']));
+  assert.ok(w.truck.x - w.truck.w / 2 >= -ROAD_HALF, `truck left edge ${w.truck.x - w.truck.w / 2}`);
+  for (let i = 0; i < 60 * 4; i++) w.update(1 / 60, fakeInput(['gas', 'right']));
+  assert.ok(w.truck.x + w.truck.w / 2 <= ROAD_HALF);
+  for (let seed = 0; seed < 10; seed++) {
+    for (let i = SAFE_CHUNKS; i < 60; i++) {
+      for (const p of generateChunk(seed, i).pickups) assert.ok(Math.abs(p.x) + p.w / 2 <= ROAD_HALF);
+    }
+  }
 });
