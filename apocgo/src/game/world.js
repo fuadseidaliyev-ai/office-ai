@@ -29,7 +29,7 @@ export class World {
     this.camera = new Camera(VIEW_W, VIEW_H);
     this.camera.zoom = BUFFER_W / VIEW_W;
     this.camera.shakeScale = PIXEL;
-    this.camera.snap(0, this.truck.y - VIEW_H * 0.2);
+    this.camera.snap(0, this.truck.y - VIEW_H * 0.22);
     this.particles = new Particles(900, PIXEL);
 
     this.obstacles = [];
@@ -153,7 +153,8 @@ export class World {
     }
 
     const lookAhead = clamp(truck.speed, 0, 900) * 0.3;
-    this.camera.follow(truck.x * 0.3, truck.y - VIEW_H * 0.12 - lookAhead, dt, 5);
+    // keep the truck in the lower part of the screen so the road ahead is visible early
+    this.camera.follow(truck.x * 0.3, truck.y - VIEW_H * 0.22 - lookAhead, dt, 5);
     this.ensureChunks();
     this.cull();
     this.checkEnd(dt);
@@ -231,19 +232,18 @@ export class World {
 
       if (!aabbOverlap(z, tb)) continue;
       if (Math.abs(truck.speed) >= ZOMBIE.killSpeed) {
+        // armour is only lost in obstacle collisions — running zombies over just jolts
         this.killZombie(z);
-        truck.damage(ZOMBIE.hitDamage * truck.stats.ram);
         truck.speed *= 0.9;
         this.camera.shake(2, 0.15);
       } else {
-        // grabbed onto the truck: keep chewing while it's slow
-        truck.damage(ZOMBIE.grabDps * truck.stats.ram * dt);
+        // grabbed onto the truck: they drag it down (no armour loss) until you speed up
+        truck.speed = Math.max(0, truck.speed - ZOMBIE.grabDrag * dt);
         const pen = aabbPenetration(z, tb);
         if (pen) {
           if (pen.x < pen.y) z.x += pen.x * pen.sx;
           else z.y += pen.y * pen.sy;
         }
-        this.hitFlash = Math.max(this.hitFlash, 0.25);
         if (this.time - this._grabToastAt > 4) {
           this._grabToastAt = this.time;
           this.toast('Зомби цепляются! Газуй!', '#ff6a55');
@@ -341,7 +341,7 @@ export class World {
         const impact = Math.abs(truck.speed);
         if (impact > 70 && truck.invuln <= 0) {
           const dmg = impact * (ob.kind === 'hole' ? 0.048 : 0.036);
-          truck.damage(dmg);
+          truck.damage(dmg * truck.stats.ram);
           truck.invuln = 0.5;
           this.hitFlash = 1;
           ob.hitAt = this.time; // the view flashes the obstacle that was hit

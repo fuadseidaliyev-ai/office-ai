@@ -170,7 +170,7 @@ function addDecor(rng, top, out) {
       const half = DECOR[kind].w / 2;
       out.decor.push({
         kind,
-        x: side * (DRIVE_HALF + 40 + half + rng.range(0, 180)),
+        x: side * (DRIVE_HALF + 40 + half + rng.range(0, 380)),
         y,
         side,
         // art is drawn for the left side; mirror it on the right unless it carries text

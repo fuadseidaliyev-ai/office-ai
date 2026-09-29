@@ -206,3 +206,21 @@ test('shotgun kills the nearest zombie, spends shells and reloads from inventory
   assert.equal(w.clip, 8);
   assert.equal(w.inv.ammo, reserve - 8);
 });
+
+test('armour is lost only in obstacle collisions — zombies never cost armour', () => {
+  const w = new World({ save: defaultSave(), seed: 8 });
+  w.obstacles = [];
+  const t = w.truck;
+  const zombie = (x, y) => ({ x, y, w: 44, h: 80, speed: 0, chaseSpeed: 0, dir: 0, t: 0, art: 'zombie1', dead: false });
+  // running one over at speed
+  t.speed = t.stats.maxSpeed;
+  w.zombies = [zombie(t.x, t.y - 170)];
+  w.update(1 / 60, fakeInput(['gas']));
+  assert.equal(w.kills, 1);
+  assert.equal(t.hp, t.stats.maxHp);
+  // several clinging on while standing still: slows, but no damage
+  t.speed = 0;
+  w.zombies = [zombie(t.x - 90, t.y), zombie(t.x + 90, t.y), zombie(t.x, t.y + 160)];
+  for (let i = 0; i < 120; i++) w.update(1 / 60, fakeInput());
+  assert.equal(t.hp, t.stats.maxHp);
+});

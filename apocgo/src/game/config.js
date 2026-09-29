@@ -2,9 +2,9 @@
 
 // World buffer. World units == pixels of the concept art (tools/reference.png), so the
 // art in assets/ is drawn at native size.
-// The camera shows 1.3x the concept-art frame (zoomed out) so there is more road to read.
-export const VIEW_W = 2080; // world units visible on screen
-export const VIEW_H = 1170;
+// The camera shows 1.56x the concept-art frame (zoomed out) so obstacles show up early.
+export const VIEW_W = 2496; // world units visible on screen
+export const VIEW_H = 1404;
 // The world is rendered into a buffer of this size (camera zoom = BUFFER_W / VIEW_W),
 // which keeps the per-frame pixel cost independent of how far out the camera is.
 export const BUFFER_W = 1600;
@@ -16,13 +16,13 @@ export const UI_H = 270;
 export const PIXEL = 3;
 // Big road obstacles, cut from the road references in tools/obstacles/. World units per
 // art pixel for them (the references are drawn at a slightly larger scale than the truck).
-export const OBSTACLE_ART_SCALE = 0.95;
+export const OBSTACLE_ART_SCALE = 0.665;
 // `side`: which side of the road the art was painted on (it is mirrored for the other).
 // `ground`: flat on the road (drawn under pickups and zombies).
 // `scale`: per-obstacle override of OBSTACLE_ART_SCALE.
 export const OBSTACLES = {
   tree: { art: 'obstTree', name: 'поваленное дерево', side: 'right', weight: 3 },
-  cars: { art: 'obstCars', name: 'разбитые машины', side: 'left', weight: 3, scale: 0.66 },
+  cars: { art: 'obstCars', name: 'разбитые машины', side: 'left', weight: 3, scale: 0.46 },
   hole: { art: 'obstHole', name: 'провал', side: 'right', weight: 3, ground: true, inset: -40 },
   rocks: { art: 'obstRocks', name: 'каменный завал', side: 'right', weight: 3 },
 };
@@ -48,7 +48,7 @@ export const TRUCK_BASE = {
   offroad: 0.55, // max-speed multiplier on the shoulders
   maxHp: 100,
   maxFuel: 100,
-  ram: 1, // damage multiplier when hitting zombies / small debris
+  ram: 1, // collision damage multiplier (the ram upgrade lowers it)
 };
 
 // Upgrades cost scrap ("запчасти"). Each entry: per-level bonus + cost per level.
@@ -81,7 +81,7 @@ export const UPGRADES = {
   },
   ram: {
     name: 'Таран',
-    desc: '−урон от зомби и мусора',
+    desc: '−урон от столкновений',
     costs: [20, 45, 75, 120],
     apply: (s, lvl) => {
       s.ram *= 1 - 0.18 * lvl;
@@ -157,8 +157,7 @@ export const ZOMBIE = {
   killSpeed: 150, // truck speed needed to run a zombie over (~15 km/h)
   w: 44,
   h: 80,
-  hitDamage: 4,
-  grabDps: 6,
+  grabDrag: 120, // px/s² a clinging zombie slows the truck (zombies never cost armour)
 };
 
 // Art-backed variants (names of files in assets/).
