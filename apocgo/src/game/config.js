@@ -3,12 +3,12 @@
 // World buffer. World units == pixels of the concept art (tools/reference.png), so the
 // art in assets/ is drawn at native size.
 // The camera shows 1.56x the concept-art frame (zoomed out) so obstacles show up early.
-export const VIEW_W = 2496; // world units visible on screen
-export const VIEW_H = 1404;
+export let VIEW_W = 2496; // world units visible on screen
+export let VIEW_H = 1404;
 // The world is rendered into a buffer of this size (camera zoom = BUFFER_W / VIEW_W),
 // which keeps the per-frame pixel cost independent of how far out the camera is.
-export const BUFFER_W = 1600;
-export const BUFFER_H = 900;
+export let BUFFER_W = 1600;
+export let BUFFER_H = 900;
 // Chase camera (view3d.js): behind and above the truck, the road runs to the horizon.
 export const PERSP = {
   camH: 768, // camera height above the road (world units)
@@ -23,8 +23,19 @@ export const PERSP = {
 };
 
 // UI layer works in its own small virtual resolution (crisp text, simple layout maths).
-export const UI_W = 480;
-export const UI_H = 270;
+export let UI_W = 480;
+export let UI_H = 270;
+
+// Screen orientation. Portrait (phone held upright) swaps the view: the whole road fits
+// the width and much more of it is visible ahead. Same camera zoom in both.
+export let PORTRAIT = false;
+
+export function setOrientation(portrait) {
+  PORTRAIT = portrait;
+  [VIEW_W, VIEW_H] = portrait ? [1404, 2496] : [2496, 1404];
+  [BUFFER_W, BUFFER_H] = portrait ? [900, 1600] : [1600, 900];
+  [UI_W, UI_H] = portrait ? [270, 480] : [480, 270];
+}
 // Procedural pixel sprites (pickups, rubble…) are drawn at this scale to match the art.
 export const PIXEL = 3;
 // Big road obstacles, cut from the road references in tools/obstacles/. World units per

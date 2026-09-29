@@ -1,5 +1,5 @@
 import { bar, panel, text } from '../engine/text.js';
-import { UI_W, UI_H, BUFFER_W, BUFFER_H, UPGRADES, UPGRADE_KEYS, computeTruckStats, goalMeters, upgradeCost } from '../game/config.js';
+import { UI_W, UI_H, BUFFER_W, BUFFER_H, PORTRAIT, UPGRADES, UPGRADE_KEYS, computeTruckStats, goalMeters, upgradeCost } from '../game/config.js';
 import { art } from '../game/art.js';
 
 // Spend scrap on truck upgrades between runs.
@@ -15,7 +15,7 @@ export class GarageScene {
     this.msgT = Math.max(0, this.msgT - dt);
     let tappedRow = false;
     UPGRADE_KEYS.forEach((key, i) => {
-      const tapped = input.tapIn(12, 58 + i * 30, 300, 26);
+      const tapped = input.tapIn(12, 58 + i * 30, rowW(), 26);
       tappedRow ||= tapped;
       if (!input.pressed(`opt${i + 1}`) && !tapped) return;
       const lvl = save.upgrades[key];
@@ -43,8 +43,9 @@ export class GarageScene {
     ctx.fillStyle = '#231b15';
     for (let y = 0; y < BUFFER_H; y += 54) ctx.fillRect(0, y, BUFFER_W, 3);
     // truck on the lift, under a work lamp
-    const cx = BUFFER_W * 0.81;
-    const cy = BUFFER_H * 0.53;
+    // landscape: beside the list; portrait: below it
+    const cx = PORTRAIT ? BUFFER_W * 0.5 : BUFFER_W * 0.81;
+    const cy = PORTRAIT ? BUFFER_H * 0.8 : BUFFER_H * 0.53;
     const g = ctx.createRadialGradient(cx, cy, 40, cx, cy, 540);
     g.addColorStop(0, 'rgba(255,210,140,0.18)');
     g.addColorStop(1, 'rgba(255,210,140,0)');
@@ -58,7 +59,7 @@ export class GarageScene {
   renderUI(ui) {
     const { save } = this.game;
     text(ui, 'ГАРАЖ', 16, 10, { size: 24, color: '#e0b25a' });
-    text(ui, `Запчасти: ${save.inventory.scrap}    Еда: ${save.inventory.food}    Корм: ${save.inventory.dogFood}`, 16, 38, { size: 11, color: '#b9c3cc' });
+    text(ui, `Детали: ${save.inventory.scrap}    Еда: ${save.inventory.food}    Корм: ${save.inventory.dogFood}`, 16, 38, { size: 11, color: '#b9c3cc' });
 
     UPGRADE_KEYS.forEach((key, i) => {
       const y = 58 + i * 30;
@@ -66,20 +67,31 @@ export class GarageScene {
       const lvl = save.upgrades[key];
       const cost = upgradeCost(key, lvl);
       const affordable = cost !== null && save.inventory.scrap >= cost;
-      panel(ui, 12, y, 300, 26);
-      text(ui, `[${i + 1}] ${u.name}`, 18, y + 2, { size: 12, color: affordable ? '#ffffff' : '#cbbf9f' });
+      const w = rowW();
+      panel(ui, 12, y, w, 26);
+      text(ui, PORTRAIT ? u.name : `[${i + 1}] ${u.name}`, 18, y + 2, { size: 12, color: affordable ? '#ffffff' : '#cbbf9f' });
       text(ui, u.desc, 18, y + 14, { size: 9, color: '#8a7d62' });
-      bar(ui, 150, y + 5, 90, 5, lvl / u.costs.length, '#d6a83a');
-      text(ui, cost === null ? 'MAX' : `${cost} зап.`, 304, y + 7, {
+      bar(ui, 12 + w * 0.46, y + 5, w * 0.3, 5, lvl / u.costs.length, '#d6a83a');
+      text(ui, cost === null ? 'MAX' : `${cost} дет.`, 12 + w - 8, y + 7, {
         size: 11, align: 'right', color: cost === null ? '#9fdc6a' : affordable ? '#e0b25a' : '#7a5a4a',
       });
     });
 
     const s = computeTruckStats(save.upgrades);
-    const statsY = 214;
-    text(ui, `Скорость ${s.maxSpeed}  Разгон ${s.accel}  Руль ${s.handling}  Броня ${s.maxHp}  Таран ×${s.ram.toFixed(2)}`, 16, statsY, { size: 9, color: '#b8ab8c' });
-    text(ui, `Следующий рейс: этап ${save.level + 1}, радиовышка через ${goalMeters(save.level)} м`, 16, statsY + 14, { size: 10 });
-    text(ui, '[Enter] В путь    [Esc] Меню    (на телефоне: тап по строке — купить, тап вне — в путь)', 16, UI_H - 18, { size: 9, color: '#d8c9a3' });
-    if (this.msgT > 0) text(ui, this.msg, 390, 230, { size: 12, align: 'center', color: '#ffcf4a' });
+    const statsY = 58 + UPGRADE_KEYS.length * 30 + 8;
+    const statLines = PORTRAIT
+      ? [`Скорость ${s.maxSpeed}  Разгон ${s.accel}  Руль ${s.handling}`, `Броня ${s.maxHp}  Таран ×${s.ram.toFixed(2)}`]
+      : [`Скорость ${s.maxSpeed}  Разгон ${s.accel}  Руль ${s.handling}  Броня ${s.maxHp}  Таран ×${s.ram.toFixed(2)}`];
+    statLines.forEach((l, i) => text(ui, l, 16, statsY + i * 12, { size: 9, color: '#b8ab8c' }));
+    const nextY = statsY + statLines.length * 12 + 2;
+    text(ui, `Следующий рейс: этап ${save.level + 1}, вышка через ${goalMeters(save.level)} м`, 16, nextY, { size: PORTRAIT ? 9 : 10 });
+    text(ui, PORTRAIT ? 'Тап по строке — купить, тап ниже — в путь' : '[Enter] В путь    [Esc] Меню    (на телефоне: тап по строке — купить, тап вне — в путь)',
+      16, UI_H - 18, { size: 9, color: '#d8c9a3' });
+    if (this.msgT > 0) text(ui, this.msg, PORTRAIT ? UI_W / 2 : 390, PORTRAIT ? nextY + 22 : 230, { size: 12, align: 'center', color: '#ffcf4a' });
   }
+}
+
+/** Width of an upgrade row: fits the narrow portrait screen. */
+function rowW() {
+  return Math.min(300, UI_W - 24);
 }

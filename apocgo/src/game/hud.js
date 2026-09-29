@@ -3,7 +3,7 @@
 
 import { text } from '../engine/text.js';
 import { art } from './art.js';
-import { PX_PER_METER, UI_W, UI_H } from './config.js';
+import { PORTRAIT, PX_PER_METER, UI_W, UI_H } from './config.js';
 
 const PANEL = 'rgba(14,12,10,0.72)';
 const BORDER = 'rgba(210,200,180,0.16)';
@@ -17,7 +17,7 @@ export function hudLayout(touch) {
   return {
     vitalsY: touch ? 56 : UI_H - 38,
     weaponY: touch ? 68 : UI_H - 30,
-    toastY: touch ? 28 : 14,
+    toastY: PORTRAIT ? 134 : touch ? 28 : 14, // portrait: below the panels, clear of them
   };
 }
 

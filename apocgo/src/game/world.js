@@ -27,6 +27,7 @@ export class World {
 
     this.truck = new Truck(computeTruckStats(save.upgrades));
     this.camera = new Camera(VIEW_W, VIEW_H);
+    this.relayout();
     this.camera.zoom = BUFFER_W / VIEW_W;
     this.camera.shakeScale = PIXEL;
     this.camera.snap(0, this.truck.y - VIEW_H * 0.22);
@@ -64,6 +65,13 @@ export class World {
     this._grabToastAt = -Infinity;
 
     this.ensureChunks();
+  }
+
+  /** Match the camera to the current screen orientation. */
+  relayout() {
+    this.camera.viewW = VIEW_W;
+    this.camera.viewH = VIEW_H;
+    this.camera.zoom = BUFFER_W / VIEW_W;
   }
 
   get distance() {

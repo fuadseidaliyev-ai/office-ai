@@ -7,7 +7,7 @@ import { Input } from './engine/input.js';
 import { Renderer } from './engine/renderer.js';
 import { SceneManager } from './engine/scene.js';
 import { ART_FILES, setArt } from './game/art.js';
-import { BUFFER_W, BUFFER_H, UI_W, UI_H } from './game/config.js';
+import { BUFFER_W, BUFFER_H, UI_W, UI_H, PORTRAIT, setOrientation } from './game/config.js';
 import { loadSave, writeSave } from './game/save.js';
 import { isTouchDevice } from './game/touchpad.js';
 import { MenuScene } from './scenes/menu.js';
@@ -25,6 +25,9 @@ const SCENES = {
 const canvas = document.getElementById('game');
 const loading = document.getElementById('loading');
 
+const isPortrait = () => window.innerHeight > window.innerWidth;
+setOrientation(isPortrait());
+
 const game = {
   debug: false,
   touchUI: isTouchDevice(), // on-screen gas / brake / steering buttons
@@ -40,6 +43,16 @@ const game = {
   },
 };
 game.input.attachTouch(canvas);
+
+// Rebuild the layout when the phone is rotated.
+window.addEventListener('resize', () => {
+  if (isPortrait() === PORTRAIT) return;
+  setOrientation(isPortrait());
+  game.renderer.setSize(BUFFER_W, BUFFER_H, UI_W, UI_H);
+  game.input.virtualW = UI_W;
+  game.input.virtualH = UI_H;
+  game.scenes.current?.relayout?.();
+});
 game.scenes = new SceneManager(game);
 game.loop = new GameLoop({
   update: (dt) => {

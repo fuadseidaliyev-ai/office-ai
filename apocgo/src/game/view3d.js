@@ -11,9 +11,9 @@ import { art } from './art.js';
 import { bushSprite, pickupSprite, radioTowerSprite, vignette } from './sprites.js';
 import { drawGround, hazardImage, isFlashing } from './view.js';
 
-const W = BUFFER_W;
-const H = BUFFER_H;
-const CX = W / 2;
+let W = BUFFER_W;
+let H = BUFFER_H;
+let CX = W / 2;
 
 
 /** Camera for this frame: world position of the focus point and the camera behind it. */
@@ -39,6 +39,9 @@ function project(cam, x, y) {
 }
 
 export function drawWorld3D(ctx, world, { hideTruck = false } = {}) {
+  W = BUFFER_W;
+  H = BUFFER_H;
+  CX = W / 2;
   const cam = makeCamera(world, hideTruck);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.imageSmoothingEnabled = true;

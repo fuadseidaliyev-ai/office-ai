@@ -20,6 +20,11 @@ export class PlayScene {
     this.applyTouchUI();
   }
 
+  relayout() {
+    this.world.relayout();
+    this.applyTouchUI();
+  }
+
   exit() {
     this.game.input.setButtons([]);
   }

@@ -23,6 +23,17 @@ export class Renderer {
     window.addEventListener('resize', () => this.resize());
   }
 
+  /** Change the world buffer / UI resolution (e.g. on an orientation change). */
+  setSize(width, height, uiW, uiH) {
+    this.W = width;
+    this.H = height;
+    this.uiW = uiW;
+    this.uiH = uiH;
+    this.buffer.width = width;
+    this.buffer.height = height;
+    this.resize();
+  }
+
   resize() {
     const dpr = window.devicePixelRatio || 1;
     const s = Math.min(window.innerWidth / this.W, window.innerHeight / this.H);
