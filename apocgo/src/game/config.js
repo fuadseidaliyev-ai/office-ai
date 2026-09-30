@@ -47,7 +47,6 @@ export const OBSTACLE_ART_SCALE = 0.665;
 export const OBSTACLES = {
   tree: { art: 'obstTree', name: 'поваленное дерево', side: 'right', weight: 3 },
   cars: { art: 'obstCars', name: 'разбитые машины', side: 'left', weight: 3, scale: 0.46 },
-  hole: { art: 'obstHole', name: 'провал', side: 'right', weight: 3, ground: true, inset: -40 },
   rocks: { art: 'obstRocks', name: 'каменный завал', side: 'right', weight: 3 },
   barricade: { art: 'obstBarricade', name: 'деревянная баррикада', side: 'right', weight: 2, scale: 0.55 },
 };

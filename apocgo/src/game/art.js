@@ -9,7 +9,7 @@ export const ART_FILES = [
   'barrel1', 'barrel2', 'barrel3', 'barrel4', 'barrelLying1', 'barrelLying2', 'tire1', 'tire2',
   'cracks1', 'cracks2', 'cracks3', 'cracks4', 'cracks5', 'blood1', 'blood2', 'blood3',
   'graffiti1', 'graffiti2', 'asphalt', 'dirt',
-  'obstTree', 'obstCars', 'obstRocks', 'obstHole', 'pickScrap', 'pickFood', 'pickDogFood',
+  'obstTree', 'obstCars', 'obstRocks', 'pickScrap', 'pickFood', 'pickDogFood',
   'btnLeft', 'btnRight', 'btnBrake', 'btnGas', 'obstBarricade',
   'truckL2', 'truckL3', 'truckL4', 'turretL2', 'turretL3', 'turretL4', 'bannerL2', 'bannerL3', 'bannerL4',
 ];

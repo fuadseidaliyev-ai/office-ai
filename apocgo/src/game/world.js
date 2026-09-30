@@ -482,7 +482,7 @@ export class World {
         truck.y += pen.y * pen.sy;
         const impact = Math.abs(truck.speed);
         if (impact > 70 && truck.invuln <= 0) {
-          const dmg = impact * (ob.kind === 'hole' ? 0.048 : 0.036);
+          const dmg = impact * 0.036;
           truck.damage(dmg * truck.stats.ram * this.lvl.ram);
           truck.invuln = 0.5;
           this.hitFlash = 1;
