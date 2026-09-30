@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DRIVE_HALF, ROAD_HALF, SAFE_CHUNKS, TRUCK_LEVELS, UPGRADE_KEYS, ZOMBIE_TYPES, computeTruckStats, upgradeCost } from '../src/game/config.js';
+import { DRIVE_HALF, ROAD_HALF, SAFE_CHUNKS, HORDE, TRUCK_LEVELS, UPGRADE_KEYS, ZOMBIE_TYPES, computeTruckStats, upgradeCost } from '../src/game/config.js';
 import { generateChunk, makeObstacle } from '../src/game/generator.js';
 import { defaultSave, normalizeSave } from '../src/game/save.js';
 import { RNG } from '../src/engine/rng.js';
@@ -159,10 +159,14 @@ test('headless run: truck drives forward, hunger ticks, nothing is eaten from a 
   assert.ok(w.satiety < 10 && w.dogSatiety < 10);
 });
 
-test('a run ends in a win at the goal and in a loss when the truck is wrecked', () => {
+test('a run ends in a win after surviving the horde at the goal, in a loss when the truck is wrecked', () => {
   const save = defaultSave();
   const w = new World({ save, seed: 5 });
   w.truck.y = w.goalY - 1;
+  w.update(1 / 60, fakeInput());
+  assert.equal(w.state, 'running');
+  assert.ok(w.horde);
+  w.horde.t = 0.01;
   w.update(1 / 60, fakeInput());
   assert.equal(w.state, 'won');
   const res = w.applyResult(save);
@@ -398,4 +402,26 @@ test('full energy (kills) and full parts bars upgrade the truck: stronger gun, b
   assert.equal(t.hp, hp);
   assert.ok(w.obstacles.every((o) => o.kind !== 'rocks' || o.smashed || o.y > t.y));
   assert.ok(t.y < -400 + 100, 'drove through');
+});
+
+test('the horde: it chases the truck for a minute; stopping is deadly, driving on survives', () => {
+  const run = (gas) => {
+    const w = new World({ save: defaultSave(), seed: 41 });
+    w.truck.y = w.goalY - 1;
+    w.update(1 / 60, fakeInput());
+    assert.ok(w.horde && w.zombies.filter((z) => z.horde).length === HORDE.size);
+    const input = fakeInput(gas ? ['gas'] : []);
+    for (let i = 0; i < 60 * 65 && w.state === 'running'; i++) {
+      w.obstacles = []; // just the chase here
+      w.truck.hp = Math.max(w.truck.hp, gas ? 50 : 0); // (gas: ignore stray bites, test the pack)
+      w.update(1 / 60, input);
+    }
+    return w;
+  };
+  const stopped = run(false);
+  assert.equal(stopped.state, 'lost');
+  assert.ok(stopped.time < 40, `caught after ${stopped.time}s`);
+  const driving = run(true);
+  assert.equal(driving.state, 'won');
+  assert.ok(driving.dogKills > 10, 'the dog shoots into the horde');
 });

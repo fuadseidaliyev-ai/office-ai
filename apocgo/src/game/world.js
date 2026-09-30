@@ -8,7 +8,7 @@ import { aabbOverlap, aabbPenetration, clamp } from '../engine/math.js';
 import { RNG } from '../engine/rng.js';
 import {
   ART, BUFFER_W, PERSP, PORTRAIT, VIEW_W, VIEW_H, CHUNK_H, DRIVE_HALF, PIXEL, ROAD_HALF, PX_PER_METER, DOG_GUN, SURVIVAL,
-  TRUCK_LEVELS, ZOMBIE, ZOMBIE_FACINGS, PICKUPS, zombieType, OBSTACLES, computeTruckStats, goalMeters,
+  HORDE, TRUCK_LEVELS, ZOMBIE, ZOMBIE_FACINGS, ZOMBIE_TYPES, PICKUPS, zombieType, OBSTACLES, computeTruckStats, goalMeters,
 } from './config.js';
 import { maskHit } from './collide.js';
 import { generateChunk } from './generator.js';
@@ -53,6 +53,7 @@ export class World {
     this.levelParts = 0;
     this.truckLevel = 1;
     this.levelBanner = null; // { level, t } while the "УРОВЕНЬ N" plate is shown
+    this.horde = null; // final scene: { t (seconds left), age, y (pack front line) }
 
     // the dog's shotgun (unlimited shells, fires on its own while the dog is fed)
     this.gunCooldown = 0;
@@ -110,10 +111,12 @@ export class World {
     while (-this.nextChunk * CHUNK_H > ahead - CHUNK_H) {
       const c = generateChunk(this.seed, this.nextChunk++);
       // nothing spawns past the finish line
+      // (during the horde the road goes on: obstacles and pickups, the zombies are behind)
       const beforeGoal = (e) => e.y > this.goalY + 150;
-      this.obstacles.push(...c.obstacles.filter(beforeGoal));
+      const onRoad = this.horde ? () => true : beforeGoal;
+      this.obstacles.push(...c.obstacles.filter(onRoad));
       this.zombies.push(...c.zombies.filter(beforeGoal));
-      this.pickups.push(...c.pickups.filter(beforeGoal));
+      this.pickups.push(...c.pickups.filter(onRoad));
       this.decals.push(...c.decals);
       this.decor.push(...c.decor);
     }
@@ -123,7 +126,7 @@ export class World {
     const limit = this.camera.bottom + 300;
     const keep = (e) => e.y < limit;
     this.obstacles = this.obstacles.filter((o) => !o.smashed && keep(o));
-    this.zombies = this.zombies.filter((z) => !z.dead && z.y < limit + 60);
+    this.zombies = this.zombies.filter((z) => !z.dead && (z.horde || z.y < limit + 60));
     this.pickups = this.pickups.filter((p) => !p.taken && keep(p));
     this.decals = this.decals.filter((d) => (d.points ? d.points[0][1] : d.y) < limit + 40);
     this.decor = this.decor.filter((d) => d.y < limit + 40);
@@ -181,6 +184,7 @@ export class World {
     this.updateSurvival(dt, input);
     this.updateDog(dt);
     this.updateZombies(dt);
+    if (this.horde) this.updateHorde(dt);
     this.collideObstacles();
     this.collectPickups();
 
@@ -190,9 +194,10 @@ export class World {
       });
     }
 
-    const lookAhead = clamp(truck.speed, 0, 900) * (PORTRAIT ? 0.12 : 0.3);
+    const lookAhead = this.horde ? 0 : clamp(truck.speed, 0, 900) * (PORTRAIT ? 0.12 : 0.3);
     // keep the truck in the lower part of the screen so the road ahead is visible early
-    this.camera.follow(truck.x * 0.3, truck.y - truckLead() - lookAhead, dt, 5);
+    // (in the horde it moves up, so the pack behind it is in view)
+    this.camera.follow(truck.x * 0.3, truck.y - truckLead(!!this.horde) - lookAhead, dt, this.horde ? 4 : 5);
     this.ensureChunks();
     this.cull();
     this.checkEnd(dt);
@@ -224,7 +229,7 @@ export class World {
     const truck = this.truck;
     const tb = truck.box;
     for (const z of this.zombies) {
-      if (z.dead) continue;
+      if (z.dead || z.horde) continue;
       z.t += dt;
       const dx = truck.x - z.x;
       const dy = truck.y - z.y;
@@ -557,9 +562,107 @@ export class World {
     this.particles.emit(x, y, { count, colors: ['#5c5650', '#7a6a58', '#3a3530'], speed: 60, life: 0.5 });
   }
 
+  // ------------------------------------------------------------ final scene: the horde
+
+  /** How far below the truck the pack's front line keeps at most. */
+  hordeGap() {
+    return VIEW_H * HORDE.gap;
+  }
+
+  startHorde() {
+    const t = this.truck;
+    this.horde = { t: HORDE.time, age: 0, y: t.y + this.hordeGap() + VIEW_H * 0.45 }; // runs in from below
+    for (let i = 0; i < HORDE.size; i++) this.zombies.push(this.hordeZombie(i < HORDE.stragglers));
+    this.camera.shake(4, 0.5);
+    this.toast('ОРДА! Продержись минуту!', '#ff5a45');
+  }
+
+  /** A pack member: `oy` = place behind the front line (negative: running ahead of it). */
+  hordeZombie(straggler, back = false) {
+    const rng = this.rng;
+    // stragglers are the quick ones; the heavies stay in the pack
+    const type = straggler ? (rng.chance(0.3) ? 'runner' : 'walker') : rng.weighted(HORDE.kinds);
+    const def = ZOMBIE_TYPES[type];
+    const oy = straggler ? -rng.range(0, VIEW_H * HORDE.ahead)
+      : back ? rng.range(VIEW_H * HORDE.depth * 0.6, VIEW_H * HORDE.depth)
+        : rng.range(0, VIEW_H * HORDE.depth);
+    const ox = rng.range(-ROAD_HALF - 80, ROAD_HALF + 80);
+    return {
+      type, hp: def.hp, horde: true, ox, oy, creep: straggler ? rng.range(...HORDE.creep) : 0,
+      x: ox, y: (this.horde?.y ?? this.truck.y) + oy, w: def.w, h: def.h,
+      t: rng.range(0, 10), step: rng.range(0, 6), facing: 'Up', dead: false,
+    };
+  }
+
+  updateHorde(dt) {
+    const h = this.horde;
+    const truck = this.truck;
+    h.t = Math.max(0, h.t - dt);
+    h.age += dt;
+    // the pack runs up the road; when it is further behind than the gap it sprints to
+    // catch up (it runs in from below at the start), so it always stays in view
+    const behind = h.y > truck.y + this.hordeGap();
+    h.y -= (behind ? Math.max(HORDE.speed, truck.speed + 250) : HORDE.speed) * dt;
+    const reach = truck.y + truck.h / 2 + 10; // the truck's rear bumper
+    let alive = 0;
+    let ahead = 0;
+    let clinging = 0;
+    for (const z of this.zombies) {
+      if (!z.horde || z.dead) continue;
+      alive++;
+      z.t += dt;
+      if (z.creep) {
+        // stragglers break away from the pack and close in on the truck
+        z.oy -= z.creep * dt;
+        z.ox += (truck.x - z.ox) * Math.min(1, dt * 0.7);
+      }
+      if (z.oy < 0) ahead++;
+      z.x = z.ox + Math.sin(z.t * 1.7 + z.ox) * 10;
+      z.y = h.y + z.oy;
+      z.step = (z.step ?? 0) + dt * (z.type === 'runner' ? 15 : z.type === 'heavy' ? 7 : 10);
+      // caught up with the truck: hang on the rear, drag it and tear at the armour
+      // (they never overtake it)
+      if (z.y < reach) {
+        z.oy = reach - h.y;
+        z.y = reach;
+        if (Math.abs(z.x - truck.x) < 120) clinging++;
+      }
+    }
+    if (clinging) {
+      truck.damage(HORDE.contactDps * Math.min(4, clinging) * dt);
+      truck.speed = Math.max(0, truck.speed - ZOMBIE.grabDrag * Math.min(3, clinging) * dt);
+      if (this.time - this._grabToastAt > 3) {
+        this._grabToastAt = this.time;
+        this.toast('Орда догоняет! Газуй!', '#ff6a55');
+      }
+    }
+    // the pack itself rolls over a truck that stopped
+    if (h.y < reach) {
+      truck.damage(HORDE.packDps * dt);
+      this.camera.shake(2, 0.1);
+    }
+    // now and then one more breaks away from the front of the pack and runs for the truck
+    h.spawn = (h.spawn ?? 0) - dt;
+    if (h.spawn <= 0 && ahead < HORDE.stragglers) {
+      h.spawn = HORDE.stragglerEvery;
+      let z = null;
+      for (const c of this.zombies) {
+        if (c.horde && !c.dead && !c.creep && c.type !== 'heavy' && (!z || c.oy < z.oy)) z = c;
+      }
+      if (z) z.creep = this.rng.range(...HORDE.creep) * 2;
+    }
+    // killed ones are replaced at the back of the pack
+    for (; alive < HORDE.size; alive++) {
+      const z = this.hordeZombie(false, true);
+      z.y = h.y + z.oy;
+      this.zombies.push(z);
+    }
+  }
+
   checkEnd(dt) {
     const t = this.truck;
-    if (t.y <= this.goalY) return this.end('won', 'Вы добрались до радиовышки!');
+    if (!this.horde && t.y <= this.goalY) return this.startHorde();
+    if (this.horde && this.horde.t <= 0) return this.end('won', 'Вы пережили орду!');
     if (t.hp <= 0) return this.end('lost', 'Машина разбита');
   }
 
@@ -610,6 +713,7 @@ function facingOf(z, dx, dy) {
  * How far below the screen centre the truck sits at rest. Portrait shows a lot of road,
  * so the truck sits higher there (clear of the driving buttons).
  */
-function truckLead() {
+function truckLead(horde = false) {
+  if (horde) return VIEW_H * (PORTRAIT ? -0.13 : -0.1); // higher: the pack behind in view
   return VIEW_H * (PORTRAIT ? 0.07 : 0.22);
 }

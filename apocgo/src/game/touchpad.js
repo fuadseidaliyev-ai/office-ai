@@ -32,7 +32,15 @@ const ACCENT = {
   shoot: '#e0b25a',
 };
 
-export function drawTouchButtons(ui, buttons, input) {
+/** `opacity` < 1 makes the buttons see-through (the final horde scene). */
+export function drawTouchButtons(ui, buttons, input, opacity = 1) {
+  ui.save();
+  ui.globalAlpha = opacity;
+  drawButtons(ui, buttons, input, opacity);
+  ui.restore();
+}
+
+function drawButtons(ui, buttons, input, opacity) {
   for (const b of buttons) {
     const held = input.isButtonHeld(b) || input.down(b.action);
     const img = b.art && art[b.art];
@@ -42,11 +50,11 @@ export function drawTouchButtons(ui, buttons, input) {
       const w = b.w * k;
       const h = b.h * k;
       ui.save();
-      ui.globalAlpha = held ? 1 : 0.88;
+      ui.globalAlpha = (held ? 1 : 0.88) * opacity;
       ui.drawImage(img, b.x + (b.w - w) / 2, b.y + (b.h - h) / 2, w, h);
       if (held) {
         ui.globalCompositeOperation = 'lighter';
-        ui.globalAlpha = 0.18;
+        ui.globalAlpha = 0.18 * opacity;
         ui.drawImage(img, b.x + (b.w - w) / 2, b.y + (b.h - h) / 2, w, h);
       }
       ui.restore();
@@ -54,14 +62,14 @@ export function drawTouchButtons(ui, buttons, input) {
     }
     const accent = ACCENT[b.action] || '#e9e4d8';
     ui.save();
-    ui.globalAlpha = held ? 0.95 : 0.6;
+    ui.globalAlpha = (held ? 0.95 : 0.6) * opacity;
     ui.fillStyle = held ? 'rgba(60,48,34,0.85)' : 'rgba(14,12,10,0.6)';
     roundRect(ui, b.x, b.y, b.w, b.h, 6);
     ui.fill();
     ui.lineWidth = held ? 1.4 : 0.8;
     ui.strokeStyle = held ? accent : 'rgba(233,228,216,0.35)';
     ui.stroke();
-    ui.globalAlpha = held ? 1 : 0.85;
+    ui.globalAlpha = (held ? 1 : 0.85) * opacity;
     drawIcon(ui, b, held ? accent : '#e9e4d8');
     if (b.label) {
       text(ui, b.label, b.x + b.w / 2, b.y + b.h - 11, {

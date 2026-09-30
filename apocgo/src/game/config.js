@@ -190,6 +190,23 @@ export const TRUCK_LEVELS = [
     ram: 0.4, smash: ['tree', 'barricade', 'rocks', 'cars'], banner: 'bannerL4', gun: { cooldown: 0.16, damage: 3, range: 820 } },
 ];
 
+// Final scene: at the tower the horde attacks from behind. Survive `time` seconds while it
+// chases the truck. Distances are shares of the screen height (VIEW_H).
+export const HORDE = {
+  time: 60,
+  speed: 520, // px/s the pack runs (the truck's top speed is 720, hungry 432)
+  size: 140, // zombies in the pack (killed ones are replaced at the back)
+  stragglers: 12, // of them running ahead of the pack toward the truck
+  stragglerEvery: 0.9, // s between new stragglers breaking away (replacing killed ones)
+  gap: 0.33, // pack front line below the truck, at most
+  depth: 0.4, // pack depth behind its front line
+  ahead: 0.22, // stragglers start up to this far ahead of the line
+  creep: [15, 50], // px/s stragglers gain on the pack
+  contactDps: 2, // armour per second each zombie hanging on the truck takes (at most 4 count)
+  packDps: 12, // armour per second more when the pack itself catches the truck
+  kinds: { walker: 6, runner: 2, heavy: 2 },
+};
+
 // Per-chunk spawn tuning. `d` is difficulty 0..1 growing with distance.
 export const SPAWN = {
   difficultyChunks: 60, // chunks until difficulty reaches 1

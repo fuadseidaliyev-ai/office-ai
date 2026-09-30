@@ -75,7 +75,9 @@ export class PlayScene {
 
   renderUI(ui) {
     drawHud(ui, this.world, { fps: this.game.loop.fps, debug: this.game.debug, touch: this.game.touchUI });
-    drawTouchButtons(ui, this.buttons, this.game.input);
+    // in the final horde scene the buttons turn see-through, the road behind matters
+    const horde = this.world.horde ? Math.min(1, this.world.horde.age / 0.9) : 0;
+    drawTouchButtons(ui, this.buttons, this.game.input, 1 - horde * 0.62);
     if (this.paused) {
       ui.fillStyle = 'rgba(0,0,0,0.55)';
       ui.fillRect(0, 0, UI_W, UI_H);

@@ -22,8 +22,18 @@ export function drawHud(ui, world, { fps = 0, debug = false, touch = false } = {
   const blink = Math.floor(world.time * 4) % 2 === 0;
   const layout = hudLayout(touch);
 
-  drawCompass(ui, world);
-  drawVitals(ui, world, blink, layout.vitalsY);
+  // final scene: everything but the armour bar flies off, the armour bar moves to the middle
+  const fade = world.horde ? Math.min(1, world.horde.age / 0.9) : 0;
+  const ease = fade * fade * (3 - 2 * fade);
+  if (fade < 1) {
+    ui.save();
+    ui.globalAlpha = 1 - ease;
+    ui.translate(0, -ease * 30);
+    drawCompass(ui, world);
+    drawVitals(ui, world, blink, layout.vitalsY, fade > 0);
+    ui.restore();
+  }
+  if (world.horde) drawHordeBar(ui, world, ease, layout.vitalsY, blink);
   drawLevelBanner(ui, world);
 
   // toasts (top-centre)
@@ -116,20 +126,49 @@ function drawCompass(ui, world) {
 
 // ------------------------------------------------------------ vitals (top-left)
 
-function drawVitals(ui, world, blink, y) {
+/** The armour bar alone at the top centre, and the time left to hold out. */
+function drawHordeBar(ui, world, ease, vitalsY, blink) {
+  const t = world.truck;
+  // slides up from its place in the vitals panel and a bit toward the middle (clear of
+  // the pause button), growing a little
+  const w = 92 + ease * 12;
+  const x = 4 + Math.min(12, UI_W / 2 - 18 - w - 4) * ease;
+  const y = vitalsY + (4 - vitalsY) * ease;
+  const f = Math.max(0, Math.min(1, t.hp / t.stats.maxHp));
+  panel(ui, x, y, w, 14);
+  iconCross(ui, x + 7, y + 7, '#c8433a');
+  ui.fillStyle = 'rgba(0,0,0,0.55)';
+  ui.fillRect(x + 14, y + 4, w - 20, 6);
+  ui.fillStyle = f < 0.25 && blink ? '#ffffff' : '#c8433a';
+  ui.fillRect(x + 14, y + 4, (w - 20) * f, 6);
+  ui.fillStyle = 'rgba(255,255,255,0.14)';
+  ui.fillRect(x + 14, y + 4, (w - 20) * f, 1.5);
+  if (ease > 0.5) {
+    const s = Math.ceil(world.horde.t);
+    ui.globalAlpha = (ease - 0.5) * 2;
+    text(ui, `ОРДА · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`, x + w / 2, y + 16, {
+      size: 7.5, align: 'center', color: s <= 10 ? '#9fdc6a' : '#ff8a75', bold: true,
+    });
+    ui.globalAlpha = 1;
+  }
+}
+
+function drawVitals(ui, world, blink, y, noArmour = false) {
   const t = world.truck;
   const x = 4;
   panel(ui, x, y, 92, 54);
   // the next truck level needs both bars full: energy (kills) and spare parts
   const next = world.nextLvl;
   const rows = [
-    [iconCross, '#c8433a', t.hp / t.stats.maxHp],
+    noArmour ? null : [iconCross, '#c8433a', t.hp / t.stats.maxHp],
     [iconFork, '#4f9a45', world.satiety / 100],
     [iconPaw, '#d9822b', world.dogSatiety / 100],
     [iconBolt, '#5ec8ff', next ? world.energy / next.energy : 1, next ? `УР ${world.truckLevel}` : 'МАКС'],
     [iconGear, '#c9ced3', next ? world.levelParts / next.parts : 1, next ? `${world.levelParts}/${next.parts}` : ''],
   ];
-  rows.forEach(([icon, color, v, label], i) => {
+  rows.forEach((row, i) => {
+    if (!row) return;
+    const [icon, color, v, label] = row;
     const ry = y + 4 + i * 10;
     icon(ui, x + 7, ry + 3.5, color);
     const f = Math.max(0, Math.min(1, v));
