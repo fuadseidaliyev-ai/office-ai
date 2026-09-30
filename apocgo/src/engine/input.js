@@ -15,6 +15,7 @@ export const DEFAULT_BINDINGS = {
   debug: ['F3'],
   touchUI: ['KeyT'],
   view: ['KeyV'],
+  skipToHorde: ['KeyH'],
   opt1: ['Digit1', 'Numpad1'],
   opt2: ['Digit2', 'Numpad2'],
   opt3: ['Digit3', 'Numpad3'],

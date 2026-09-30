@@ -46,7 +46,11 @@ export class PlayScene {
 
     if (this.paused) {
       if (input.pressed('garage') || input.tapIn(UI_W / 2 - 90, UI_H / 2 + 10, 180, 18)) this.finish(); // abandon run
-      else if (input.pressed('pause') || input.pressed('confirm')) this.paused = false;
+      else if (!this.world.horde && (input.pressed('skipToHorde') || input.tapIn(UI_W / 2 - 90, UI_H / 2 + 28, 180, 18))) {
+        // playtesting shortcut: straight to the final scene
+        this.world.skipToHorde();
+        this.paused = false;
+      } else if (input.pressed('pause') || input.pressed('confirm')) this.paused = false;
       return;
     }
     if (input.pressed('pause')) {
@@ -81,10 +85,13 @@ export class PlayScene {
     if (this.paused) {
       ui.fillStyle = 'rgba(0,0,0,0.55)';
       ui.fillRect(0, 0, UI_W, UI_H);
-      panel(ui, UI_W / 2 - 90, UI_H / 2 - 36, 180, 72);
+      panel(ui, UI_W / 2 - 90, UI_H / 2 - 36, 180, this.world.horde ? 72 : 90);
       text(ui, 'ПАУЗА', UI_W / 2, UI_H / 2 - 30, { size: 20, align: 'center', color: '#e0b25a' });
       text(ui, this.game.touchUI ? 'тап — продолжить' : '[P] продолжить', UI_W / 2, UI_H / 2 - 2, { size: 11, align: 'center' });
       text(ui, this.game.touchUI ? 'прервать рейс' : '[G] прервать рейс', UI_W / 2, UI_H / 2 + 14, { size: 11, align: 'center', color: '#c9745a' });
+      if (!this.world.horde) {
+        text(ui, this.game.touchUI ? 'к орде (тест)' : '[H] к орде (тест)', UI_W / 2, UI_H / 2 + 32, { size: 11, align: 'center', color: '#8fb8d8' });
+      }
     }
   }
 }

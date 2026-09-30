@@ -569,6 +569,17 @@ export class World {
     return VIEW_H * HORDE.gap;
   }
 
+  /** Playtesting: jump to just before the tower at full speed. */
+  skipToHorde() {
+    const t = this.truck;
+    t.y = this.goalY + 600;
+    t.speed = t.stats.maxSpeed;
+    this.obstacles = this.obstacles.filter((o) => o.y < t.y - 900);
+    this.zombies = [];
+    this.camera.snap(t.x * 0.3, t.y - truckLead());
+    this.nextChunk = Math.max(this.nextChunk, Math.floor(-t.y / CHUNK_H));
+  }
+
   startHorde() {
     const t = this.truck;
     this.horde = { t: HORDE.time, age: 0, y: t.y + this.hordeGap() + VIEW_H * 0.45 }; // runs in from below
