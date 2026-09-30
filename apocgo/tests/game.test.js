@@ -86,7 +86,7 @@ test('obstacle collisions follow the drawn shape, not the bounding box', async (
   assert.ok(maskHit(trunk, tree));
 });
 
-test('car parts repair the truck; the leftover goes to the garage stock', () => {
+test('car parts repair the truck; the leftover goes to the upgrade bar, then to the stock', () => {
   const w = new World({ save: defaultSave(), seed: 4 });
   const part = (amount) => ({ type: 'scrap', amount, x: w.truck.x, y: w.truck.y, w: 30, h: 30, t: 0, taken: false });
   const scrap0 = w.inv.scrap;
@@ -95,9 +95,14 @@ test('car parts repair the truck; the leftover goes to the garage stock', () => 
   w.update(1 / 60, fakeInput());
   assert.equal(w.truck.hp, 94);
   assert.equal(w.inv.scrap, scrap0);
-  w.pickups = [part(5)]; // one part fills the last 6, four go to the stock
+  w.pickups = [part(5)]; // one part fills the last 6, four go to the upgrade bar
   w.update(1 / 60, fakeInput());
   assert.equal(w.truck.hp, w.truck.stats.maxHp);
+  assert.equal(w.levelParts, 4);
+  assert.equal(w.inv.scrap, scrap0);
+  w.pickups = [part(w.nextLvl.parts)]; // the bar fills up, the rest goes to the stock
+  w.update(1 / 60, fakeInput());
+  assert.equal(w.levelParts, w.nextLvl.parts);
   assert.equal(w.inv.scrap, scrap0 + 4);
 });
 
@@ -348,19 +353,34 @@ test('three zombie kinds: walkers and runners die from one bullet, the heavy one
   assert.deepEqual([...kinds].sort(), ['heavy', 'runner', 'walker']);
 });
 
-test('killing zombies charges energy that upgrades the truck: stronger gun, bumper, smashing', () => {
+test('full energy (kills) and full parts bars upgrade the truck: stronger gun, bumper, smashing', () => {
   const w = new World({ save: defaultSave(), seed: 31 });
   w.obstacles = [];
   w.pickups = [];
   const t = w.truck;
   assert.equal(w.truckLevel, 1);
   const zombie = (type) => ({ type, hp: ZOMBIE_TYPES[type].hp, x: t.x + 5000, y: t.y, w: 44, h: 80, speed: 0, chaseSpeed: 0, dir: 0, t: 0, dead: false });
-  // energy per kill depends on the kind; levels come at the thresholds
-  for (let i = 0; i < TRUCK_LEVELS[1].energy; i++) w.killZombie(zombie('walker'));
+  // energy alone is not enough: the parts bar must be full too
+  const kills = Math.ceil(TRUCK_LEVELS[1].energy / ZOMBIE_TYPES.walker.energy - 1e-6);
+  for (let i = 0; i < kills + 5; i++) w.killZombie(zombie('walker'));
+  assert.equal(w.truckLevel, 1);
+  assert.ok(Math.abs(w.energy - TRUCK_LEVELS[1].energy) < 1e-6, 'energy caps at full');
+  // spare parts (the truck is not damaged) fill the parts bar, the rest goes to stock
+  const stock = w.inv.scrap;
+  w.useParts(TRUCK_LEVELS[1].parts - 1);
+  assert.equal(w.truckLevel, 1);
+  w.useParts(3);
   assert.equal(w.truckLevel, 2);
+  assert.equal(w.inv.scrap, stock + 2);
   assert.ok(w.levelBanner && w.levelBanner.level === 2);
+  assert.equal(w.energy, 0);
+  assert.equal(w.levelParts, 0);
   assert.ok(w.lvl.gun.cooldown < TRUCK_LEVELS[0].gun.cooldown);
-  while (w.truckLevel < 4) w.killZombie(zombie('heavy'));
+  // parts first, then energy also works
+  while (w.truckLevel < 4) {
+    w.useParts(w.nextLvl.parts);
+    while (w.truckLevel < 4 && w.energy < w.nextLvl.energy - 1e-9) w.killZombie(zombie('heavy'));
+  }
   assert.equal(w.truckLevel, 4);
   assert.equal(w.nextLvl, null);
   assert.ok(t.hitBoxes.length === 4, 'the longer truck has a nose box');

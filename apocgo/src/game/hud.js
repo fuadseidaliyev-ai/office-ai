@@ -119,16 +119,15 @@ function drawCompass(ui, world) {
 function drawVitals(ui, world, blink, y) {
   const t = world.truck;
   const x = 4;
-  panel(ui, x, y, 92, 44);
-  // energy: progress toward the next truck level
-  const cur = world.lvl;
+  panel(ui, x, y, 92, 54);
+  // the next truck level needs both bars full: energy (kills) and spare parts
   const next = world.nextLvl;
-  const energy = next ? (world.energy - cur.energy) / (next.energy - cur.energy) : 1;
   const rows = [
     [iconCross, '#c8433a', t.hp / t.stats.maxHp],
     [iconFork, '#4f9a45', world.satiety / 100],
     [iconPaw, '#d9822b', world.dogSatiety / 100],
-    [iconBolt, '#5ec8ff', energy, next ? `УР ${cur.level}` : 'МАКС'],
+    [iconBolt, '#5ec8ff', next ? world.energy / next.energy : 1, next ? `УР ${world.truckLevel}` : 'МАКС'],
+    [iconGear, '#c9ced3', next ? world.levelParts / next.parts : 1, next ? `${world.levelParts}/${next.parts}` : ''],
   ];
   rows.forEach(([icon, color, v, label], i) => {
     const ry = y + 4 + i * 10;
@@ -136,13 +135,30 @@ function drawVitals(ui, world, blink, y) {
     const f = Math.max(0, Math.min(1, v));
     ui.fillStyle = 'rgba(0,0,0,0.55)';
     ui.fillRect(x + 14, ry + 1, 56, 5);
-    ui.fillStyle = f < 0.25 && blink && !label ? '#ffffff' : color;
+    ui.fillStyle = f < 0.25 && blink && label === undefined ? '#ffffff' : color;
     ui.fillRect(x + 14, ry + 1, 56 * f, 5);
     ui.fillStyle = 'rgba(255,255,255,0.12)';
     ui.fillRect(x + 14, ry + 1, 56 * f, 1.2);
-    if (label) text(ui, label, x + 88, ry - 0.3, { size: 5.5, align: 'right', color: '#bfe6ff', shadow: false, bold: true });
+    if (label !== undefined && label !== '') text(ui, label, x + 88, ry - 0.3, { size: 5.5, align: 'right', color: '#bfe6ff', shadow: false, bold: true });
   });
   text(ui, `Детали в запасе: ${world.inv.scrap}`, x + 2, y - 9, { size: 6.5, color: '#c9ced3', bold: true });
+}
+
+function iconGear(ui, x, y, c) {
+  ui.fillStyle = c;
+  ui.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    ui.rect(x + Math.cos(a) * 2.8 - 0.8, y + Math.sin(a) * 2.8 - 0.8, 1.6, 1.6);
+  }
+  ui.fill();
+  ui.beginPath();
+  ui.arc(x, y, 2.6, 0, Math.PI * 2);
+  ui.fill();
+  ui.fillStyle = '#1a1714';
+  ui.beginPath();
+  ui.arc(x, y, 1, 0, Math.PI * 2);
+  ui.fill();
 }
 
 function iconBolt(ui, x, y, c) {

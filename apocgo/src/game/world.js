@@ -47,8 +47,10 @@ export class World {
     this.gained = { scrap: 0, food: 0, dogFood: 0 };
     this.repaired = 0; // armour restored by parts this run
     this.kills = 0;
-    // energy from kills upgrades the truck during the run (TRUCK_LEVELS)
+    // energy from kills + spare car parts upgrade the truck during the run (TRUCK_LEVELS);
+    // both count toward the next level and start over after each upgrade
     this.energy = 0;
+    this.levelParts = 0;
     this.truckLevel = 1;
     this.levelBanner = null; // { level, t } while the "УРОВЕНЬ N" plate is shown
 
@@ -292,8 +294,29 @@ export class World {
   }
 
   gainEnergy(amount) {
-    this.energy += amount;
-    while (this.nextLvl && this.energy >= this.nextLvl.energy) this.levelUp();
+    const next = this.nextLvl;
+    if (!next) return;
+    this.energy = Math.min(next.energy, this.energy + amount);
+    this.checkLevelUp();
+  }
+
+  /** Spare parts go into the next upgrade first; returns how many were taken. */
+  gainLevelParts(amount) {
+    const next = this.nextLvl;
+    if (!next) return 0;
+    const take = Math.min(amount, next.parts - this.levelParts);
+    this.levelParts += take;
+    this.checkLevelUp();
+    return take;
+  }
+
+  /** The upgrade happens when both the energy and the parts bars are full. */
+  checkLevelUp() {
+    const next = this.nextLvl;
+    if (!next || this.energy < next.energy - 1e-9 || this.levelParts < next.parts) return;
+    this.energy = 0;
+    this.levelParts = 0;
+    this.levelUp();
   }
 
   levelUp() {
@@ -520,7 +543,10 @@ export class World {
       this.toast(`Ремонт: +${Math.round(t.hp - before)} брони`, '#7fe07a');
       this.particles.emit(t.x, t.y, { count: 14, colors: ['#7fe07a', '#d8f5c0'], speed: 70, life: 0.6 });
     }
-    const left = amount - used;
+    let left = amount - used;
+    const toLevel = left > 0 ? this.gainLevelParts(left) : 0;
+    if (toLevel > 0) this.toast(`+${toLevel} ${PICKUPS.scrap.name} на улучшение`, '#c9ced3');
+    left -= toLevel;
     if (left > 0) {
       this.inv.scrap += left;
       this.toast(`+${left} ${PICKUPS.scrap.name} в запас`, '#b9c3cc');
