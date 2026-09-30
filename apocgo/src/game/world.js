@@ -600,6 +600,8 @@ export class World {
     const ox = rng.range(-ROAD_HALF - 80, ROAD_HALF + 80);
     return {
       type, hp: def.hp, horde: true, ox, oy, creep: straggler ? rng.range(...HORDE.creep) : 0,
+      // place around the truck once it is caught: angle and ring (1 = hugging it)
+      slot: rng.range(0, Math.PI * 2), ring: 1 + rng.next() ** 2 * 1.6,
       x: ox, y: (this.horde?.y ?? this.truck.y) + oy, w: def.w, h: def.h,
       t: rng.range(0, 10), step: rng.range(0, 6), facing: 'Up', dead: false,
     };
@@ -614,7 +616,13 @@ export class World {
     // catch up (it runs in from below at the start), so it always stays in view
     const behind = h.y > truck.y + this.hordeGap();
     h.y -= (behind ? Math.max(HORDE.speed, truck.speed + 250) : HORDE.speed) * dt;
+    h.y = Math.max(h.y, truck.y); // it doesn't run on past the truck: it stays around it
     const reach = truck.y + truck.h / 2 + 10; // the truck's rear bumper
+    // once the pack itself reaches the truck it flows around it and surrounds it; until
+    // then the ones that catch up only hang on at the back
+    const engulf = h.y < reach + 80;
+    const rx = 120;
+    const ry = truck.front + 40;
     let alive = 0;
     let ahead = 0;
     let clinging = 0;
@@ -628,20 +636,35 @@ export class World {
         z.ox += (truck.x - z.ox) * Math.min(1, dt * 0.7);
       }
       if (z.oy < 0) ahead++;
-      z.x = z.ox + Math.sin(z.t * 1.7 + z.ox) * 10;
-      z.y = h.y + z.oy;
-      z.step = (z.step ?? 0) + dt * (z.type === 'runner' ? 15 : z.type === 'heavy' ? 7 : 10);
-      // caught up with the truck: hang on the rear, drag it and tear at the armour
-      // (they never overtake it)
-      if (z.y < reach) {
-        z.oy = reach - h.y;
-        z.y = reach;
-        if (Math.abs(z.x - truck.x) < 120) clinging++;
+      // where it runs: its place in the pack, or a place around the truck
+      let tx = z.ox + Math.sin(z.t * 1.7 + z.ox) * 10;
+      let ty = h.y + z.oy;
+      let around = false;
+      if (ty < reach) {
+        // around the whole truck, or on the arc behind it while the truck gets away
+        const a = engulf ? z.slot : Math.PI / 2 + (z.slot - Math.PI) * 0.33;
+        tx = truck.x + Math.cos(a) * rx * z.ring;
+        ty = truck.y + Math.sin(a) * ry * (0.75 + z.ring * 0.25);
+        around = true;
+        if (!engulf) z.oy = Math.max(z.oy, reach - h.y); // it doesn't pass the truck
       }
+      const k = Math.min(1, dt * (around ? 3 : 6));
+      const x0 = z.x;
+      const y0 = z.y;
+      z.x += (tx - z.x) * k;
+      z.y += (ty - z.y) * k;
+      if (around) {
+        z.facing = facingOf(z, z.x - x0 || truck.x - z.x, z.y - y0 || truck.y - z.y);
+        if (z.ring < 1.35 && Math.hypot(tx - z.x, ty - z.y) < 60) clinging++;
+      } else {
+        z.facing = 'Up';
+      }
+      z.step = (z.step ?? 0) + dt * (z.type === 'runner' ? 15 : z.type === 'heavy' ? 7 : 10);
     }
     if (clinging) {
       truck.damage(HORDE.contactDps * Math.min(4, clinging) * dt);
-      truck.speed = Math.max(0, truck.speed - ZOMBIE.grabDrag * Math.min(3, clinging) * dt);
+      // (they slow it down, but on full throttle it can still break out)
+      truck.speed = Math.max(0, truck.speed - ZOMBIE.grabDrag * Math.min(1.5, clinging * 0.5) * dt);
       if (this.time - this._grabToastAt > 3) {
         this._grabToastAt = this.time;
         this.toast('Орда догоняет! Газуй!', '#ff6a55');

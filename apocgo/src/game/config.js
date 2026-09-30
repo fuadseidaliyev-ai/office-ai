@@ -203,7 +203,7 @@ export const HORDE = {
   ahead: 0.22, // stragglers start up to this far ahead of the line
   creep: [15, 50], // px/s stragglers gain on the pack
   contactDps: 2, // armour per second each zombie hanging on the truck takes (at most 4 count)
-  packDps: 12, // armour per second more when the pack itself catches the truck
+  packDps: 6, // armour per second more when the pack itself surrounds the truck
   kinds: { walker: 6, runner: 2, heavy: 2 },
 };
 

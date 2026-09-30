@@ -425,3 +425,49 @@ test('the horde: it chases the truck for a minute; stopping is deadly, driving o
   assert.equal(driving.state, 'won');
   assert.ok(driving.dogKills > 10, 'the dog shoots into the horde');
 });
+
+test('reversing with the wheel turned right swings the tail right: the nose turns left', () => {
+  const t = new Truck(computeTruckStats({}));
+  for (let i = 0; i < 90; i++) t.update(1 / 60, fakeInput(['brake', 'right']));
+  assert.ok(t.speed < 0, 'reversing');
+  assert.ok(t.vx > 0, 'the truck drifts to the right');
+  assert.ok(t.tilt < -0.05, `nose turned left: tilt ${t.tilt}`);
+  // forward it is the other way round
+  const f = new Truck(computeTruckStats({}));
+  for (let i = 0; i < 90; i++) f.update(1 / 60, fakeInput(['gas', 'right']));
+  assert.ok(f.tilt > 0.05);
+});
+
+test('the horde surrounds a truck that got stuck instead of queuing up behind it', () => {
+  const w = new World({ save: defaultSave(), seed: 43 });
+  w.truck.y = w.goalY - 1;
+  w.truck.speed = w.truck.stats.maxSpeed;
+  w.update(1 / 60, fakeInput());
+  w.truck.damage = () => {}; // just watch the pack
+  for (let i = 0; i < 60 * 6; i++) {
+    w.obstacles = [];
+    w.update(1 / 60, fakeInput(['brake']));
+  }
+  const t = w.truck;
+  const near = w.zombies.filter((z) => z.horde && !z.dead && Math.hypot(z.x - t.x, z.y - t.y) < 420);
+  const sides = { front: 0, back: 0, left: 0, right: 0 };
+  for (const z of near) {
+    if (z.y < t.y - 150) sides.front++;
+    if (z.y > t.y + 150) sides.back++;
+    if (z.x < t.x - 100) sides.left++;
+    if (z.x > t.x + 100) sides.right++;
+  }
+  for (const [side, n] of Object.entries(sides)) assert.ok(n >= 5, `${side}: ${n} (${JSON.stringify(sides)})`);
+});
+
+test('a surrounded truck can still break out of the horde on full throttle', () => {
+  const w = new World({ save: defaultSave(), seed: 44 });
+  w.truck.y = w.goalY - 1;
+  w.update(1 / 60, fakeInput());
+  w.truck.damage = () => {};
+  const step = (keys, s) => { for (let i = 0; i < 60 * s; i++) { w.obstacles = []; w.update(1 / 60, fakeInput(keys)); } };
+  step(['brake'], 6);
+  assert.ok(w.horde.y < w.truck.y + w.truck.h / 2 + 80, 'surrounded');
+  step(['gas'], 8);
+  assert.ok(w.horde.y > w.truck.y + w.truck.h / 2 + 80, 'broke out');
+});

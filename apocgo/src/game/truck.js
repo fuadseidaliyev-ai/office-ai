@@ -72,7 +72,10 @@ export class Truck {
 
     // The body swings into the turn (up to 30° at full speed), following
     // the direction it actually moves in, so it straightens out again against a wall.
-    const heading = clamp(Math.atan2(this.vx, Math.max(Math.abs(this.speed) * 0.6, 160)), -MAX_YAW, MAX_YAW);
+    // Reversing, it is the rear that leads: steering right swings the tail to the right,
+    // so the nose turns the other way.
+    const dir = this.speed < -1 ? -1 : 1;
+    const heading = dir * clamp(Math.atan2(this.vx, Math.max(Math.abs(this.speed) * 0.6, 160)), -MAX_YAW, MAX_YAW);
     this.tilt += (heading - this.tilt) * damp(7, dt);
   }
 
